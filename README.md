@@ -24,6 +24,12 @@ npm run dev
 
 浏览器打开 http://localhost:5173 即可看到**演示模式**（内置示例订单数据，可完整体验编辑/选记录/预览/打印）。真实连接多维表格时，插件会通过 SDK 读取当前表格的字段和记录。
 
+## 已部署站点（GitHub Pages）
+
+- 正式地址：https://xiao8-us.github.io/bitable-print-plugin/
+- 代码仓库：https://github.com/Xiao8-us/bitable-print-plugin
+- 修改代码后 `git push`，GitHub Actions 自动构建发布，1~2 分钟生效
+
 ## 接入飞书多维表格
 
 插件需要一个**可访问的 HTTPS 网址**（localhost 除外）。
