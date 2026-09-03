@@ -1,5 +1,5 @@
 import { bitable, FieldType } from '@lark-base-open/js-sdk'
-import { markRaw, reactive } from 'vue'
+import { reactive } from 'vue'
 
 export const FIELD_TYPE_NAMES = {
   [FieldType.NotSupport]: '不支持',
@@ -35,7 +35,6 @@ export const FIELD_TYPE_NAMES = {
 
 export const ds = reactive({
   connected: false,
-  table: null,
   tableId: '',
   tableName: '',
   viewId: '',
@@ -47,7 +46,19 @@ export const ds = reactive({
   error: ''
 })
 
+// SDK 句柄绝不能放进 Vue 响应式状态：
+// 宿主返回的对象带只读不可配置的 context 属性，被 Vue Proxy 包装后
+// 一访问 .context 就会触发 Proxy 不变式 TypeError。
+// 因此 SDK 句柄用普通模块变量保存；拿到的数据先清洗成纯对象再入状态。
+let activeTable = null
 let token = 0
+
+function sanitizeRecord(r) {
+  return {
+    recordId: r.recordId,
+    fields: { ...(r.fields || {}) }
+  }
+}
 
 const MOCK_FIELDS = [
   { id: 'fld_order_no', name: '订单号', type: FieldType.Text, isPrimary: true, typeName: '文本' },
@@ -103,7 +114,7 @@ const MOCK_RECORDS = [
 ]
 
 function loadMock() {
-  ds.table = null
+  activeTable = null
   ds.tableId = 'mock'
   ds.tableName = '演示数据（订单表）'
   ds.viewId = ''
@@ -175,9 +186,7 @@ async function initReal(my) {
   if (my !== token) return
   const fields = await table.getFieldMetaList()
   if (my !== token) return
-  // SDK 对象内部有只读不可配置属性，不能放进 Vue 响应式代理，
-  // 否则调用其方法（如 getRecordsByPage）会触发 Proxy 不变式报错
-  ds.table = markRaw(table)
+  activeTable = table
   ds.tableId = meta.id
   ds.tableName = meta.name
   ds.viewId = viewId
@@ -193,7 +202,7 @@ async function initReal(my) {
 }
 
 export async function loadRecords() {
-  if (!ds.connected || !ds.table) return
+  if (!ds.connected || !activeTable) return
   const my = ++token
   ds.loading = true
   ds.progress = 0
@@ -202,13 +211,13 @@ export async function loadRecords() {
     let pageToken
     let hasMore = true
     while (hasMore && my === token) {
-      const res = await ds.table.getRecordsByPage({
+      const res = await activeTable.getRecordsByPage({
         pageSize: 200,
         pageToken: pageToken || undefined,
         viewId: ds.viewId || undefined,
         stringValue: true
       })
-      all.push(...(res.records || []))
+      all.push(...(res.records || []).map(sanitizeRecord))
       hasMore = !!res.hasMore
       pageToken = res.pageToken
       ds.progress = all.length
@@ -228,17 +237,17 @@ export async function loadRecords() {
 }
 
 export async function ensureRecords(ids) {
-  if (!ds.connected || !ds.table) return
+  if (!ds.connected || !activeTable) return
   const have = new Set(ds.records.map((r) => r.recordId))
   for (const id of ids) {
     if (have.has(id)) continue
     try {
-      const val = await ds.table.getRecordById(id)
+      const val = await activeTable.getRecordById(id)
       const fields = {}
       for (const [fid, v] of Object.entries(val.fields || {})) {
         fields[fid] = formatCellValue(fid, v)
       }
-      ds.records.push({ recordId: id, fields })
+      ds.records.push({ recordId: val.recordId, fields })
       have.add(id)
     } catch (e) {
       /* 单条失败不阻断整体 */
@@ -264,9 +273,9 @@ export async function pickRecordsByDialog() {
 }
 
 export async function selectVisibleRecords() {
-  if (!ds.connected || !ds.table) return
+  if (!ds.connected || !activeTable) return
   try {
-    const view = await ds.table.getViewById(ds.viewId)
+    const view = await activeTable.getViewById(ds.viewId)
     const ids = await view.getVisibleRecordIdList()
     ds.selectedRecordIds = [...new Set(ids.filter(Boolean))]
     await ensureRecords(ds.selectedRecordIds)

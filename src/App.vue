@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { connect, ds, loadRecords } from './bitable.js'
 import { exportTemplates, importTemplates, loadTemplates } from './store.js'
 import TemplateEditor from './components/TemplateEditor.vue'
@@ -19,7 +19,21 @@ onMounted(async () => {
   await connect()
   loadTemplates()
   await loadRecords()
+  window.addEventListener('error', onGlobalError)
+  window.addEventListener('unhandledrejection', onGlobalError)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('error', onGlobalError)
+  window.removeEventListener('unhandledrejection', onGlobalError)
+})
+
+function onGlobalError(e) {
+  const raw = e?.error || e?.reason
+  const msg = raw?.stack || raw?.message || e?.message || ''
+  if (!msg) return
+  ds.error = '运行出错（可复制此信息反馈）：' + String(msg).slice(0, 400)
+}
 
 async function refresh() {
   await connect()
