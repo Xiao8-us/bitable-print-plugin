@@ -1,5 +1,5 @@
 import { bitable, FieldType } from '@lark-base-open/js-sdk'
-import { reactive } from 'vue'
+import { markRaw, reactive } from 'vue'
 
 export const FIELD_TYPE_NAMES = {
   [FieldType.NotSupport]: '不支持',
@@ -175,7 +175,9 @@ async function initReal(my) {
   if (my !== token) return
   const fields = await table.getFieldMetaList()
   if (my !== token) return
-  ds.table = table
+  // SDK 对象内部有只读不可配置属性，不能放进 Vue 响应式代理，
+  // 否则调用其方法（如 getRecordsByPage）会触发 Proxy 不变式报错
+  ds.table = markRaw(table)
   ds.tableId = meta.id
   ds.tableName = meta.name
   ds.viewId = viewId
