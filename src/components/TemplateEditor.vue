@@ -1,0 +1,302 @@
+<script setup>
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { ds } from '../bitable.js'
+import {
+  addBlock,
+  addMetaRow,
+  addTableColumn,
+  createTemplate,
+  currentTemplate,
+  duplicateTemplate,
+  moveBlock,
+  moveTableColumn,
+  removeBlock,
+  removeMetaRow,
+  removeTableColumn,
+  removeTemplate,
+  store
+} from '../store.js'
+import { renderAll } from '../render.js'
+
+const showSettings = ref(false)
+const focusedBlockId = ref('')
+const focusedEl = ref(null)
+const token = '{{' + '字段名' + '}}'
+
+const previewRecords = computed(() => {
+  const sel = ds.records.filter((r) => ds.selectedRecordIds.includes(r.recordId))
+  return sel.length ? sel : ds.records.slice(0, 3)
+})
+
+const previewHtml = computed(() =>
+  currentTemplate.value ? renderAll(currentTemplate.value, previewRecords.value) : ''
+)
+
+const pageScale = ref(0.5)
+function updateScale() {
+  pageScale.value = Math.max(0.3, Math.min(1, (window.innerWidth - 40) / 794))
+}
+onMounted(() => {
+  updateScale()
+  window.addEventListener('resize', updateScale)
+})
+onUnmounted(() => window.removeEventListener('resize', updateScale))
+
+function onTextFocus(blockId, ev) {
+  focusedBlockId.value = blockId
+  focusedEl.value = ev.target
+}
+
+function insertVarToFocused(name) {
+  const t = currentTemplate.value
+  if (!t) return
+  let block = t.blocks.find((b) => b.id === focusedBlockId.value && b.type === 'text')
+  if (!block) block = t.blocks.find((b) => b.type === 'text')
+  const varText = '{{' + name + '}}'
+  if (!block) return
+  const el = focusedEl.value
+  if (el && block.id === focusedBlockId.value) {
+    const start = el.selectionStart ?? block.text.length
+    const end = el.selectionEnd ?? start
+    block.text = block.text.slice(0, start) + varText + block.text.slice(end)
+    nextTick(() => {
+      el.focus()
+      const pos = start + varText.length
+      el.setSelectionRange(pos, pos)
+    })
+  } else {
+    block.text += varText
+  }
+}
+
+function onFieldDragStart(ev, field) {
+  ev.dataTransfer.setData('text/plain', field.id)
+  ev.dataTransfer.effectAllowed = 'copy'
+}
+
+function onDropMeta(block, ev) {
+  ev.preventDefault()
+  const fid = ev.dataTransfer.getData('text/plain')
+  if (fid && ds.fields.some((f) => f.id === fid)) addMetaRow(block, fid)
+}
+
+function onDropTable(block, ev) {
+  ev.preventDefault()
+  const fid = ev.dataTransfer.getData('text/plain')
+  if (fid && ds.fields.some((f) => f.id === fid)) addTableColumn(block, fid)
+}
+
+function onDropText(block, ev) {
+  ev.preventDefault()
+  const fid = ev.dataTransfer.getData('text/plain')
+  const f = ds.fields.find((x) => x.id === fid)
+  if (f) block.text += '{{' + f.name + '}}'
+}
+
+const typeTag = { meta: '单', table: '表', text: '文', sign: '签' }
+</script>
+
+<template>
+  <section v-if="currentTemplate" class="editor">
+    <div class="tpl-bar">
+      <span class="tpl-bar-title">模板</span>
+      <div class="chips scroll-x">
+        <button
+          v-for="t in store.templates"
+          :key="t.id"
+          class="chip tpl-chip"
+          :class="{ active: t.id === currentTemplate.id }"
+          @click="store.currentTemplateId = t.id"
+        >
+          {{ t.name }}
+        </button>
+      </div>
+      <button class="btn btn-sm" title="新建模板" @click="createTemplate()">＋</button>
+      <button class="btn btn-sm" title="复制当前模板" @click="duplicateTemplate()">⧉</button>
+      <button
+        class="btn btn-sm btn-danger"
+        title="删除当前模板"
+        @click="removeTemplate(currentTemplate.id)"
+      >
+        ×
+      </button>
+    </div>
+
+    <div class="field-bar">
+      <span class="field-bar-title">字段（点击插入文本 / 拖入区块）</span>
+      <div class="chips scroll-x">
+        <span
+          v-for="f in ds.fields"
+          :key="f.id"
+          class="chip field-chip"
+          :title="f.typeName"
+          draggable="true"
+          @click="insertVarToFocused(f.name)"
+          @dragstart="onFieldDragStart($event, f)"
+        >
+          {{ f.name }}
+        </span>
+      </div>
+    </div>
+
+    <button class="settings-toggle" @click="showSettings = !showSettings">
+      模板设置（标题 / 纸张 / 模式） {{ showSettings ? '▲' : '▼' }}
+    </button>
+
+    <div v-if="showSettings" class="settings">
+      <div class="form-grid">
+        <label class="field">
+          <span>模板名称</span>
+          <input v-model="currentTemplate.name" class="input" />
+        </label>
+        <label class="field">
+          <span>单据标题</span>
+          <input v-model="currentTemplate.title" class="input" placeholder="如：出库单" />
+        </label>
+        <label class="field">
+          <span>副标题</span>
+          <input v-model="currentTemplate.subtitle" class="input" placeholder="如：编号随记录字段填入" />
+        </label>
+        <label class="field">
+          <span>Logo 图片地址</span>
+          <input v-model="currentTemplate.logoUrl" class="input" placeholder="https://…（可留空）" />
+        </label>
+        <label class="field">
+          <span>纸张</span>
+          <select v-model="currentTemplate.paper" class="input">
+            <option value="a4">A4</option>
+            <option value="a5">A5</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>打印模式</span>
+          <select v-model="currentTemplate.pageBreak" class="input">
+            <option value="perRecord">一单一页（每张记录一页）</option>
+            <option value="continuous">汇总列表（明细表列出所有记录）</option>
+          </select>
+        </label>
+        <label class="field field-wide">
+          <span>页脚</span>
+          <input v-model="currentTemplate.footer" class="input" />
+        </label>
+      </div>
+    </div>
+
+    <div class="blocks">
+      <div
+        v-for="(block, i) in currentTemplate.blocks"
+        :key="block.id"
+        class="block-card"
+        :class="'type-' + block.type"
+      >
+        <div class="block-head">
+          <span class="block-type-tag">{{ typeTag[block.type] }}</span>
+          <input v-model="block.label" class="input block-label" placeholder="区块名称" />
+          <button class="icon-btn" title="上移" @click="moveBlock(block.id, -1)">↑</button>
+          <button class="icon-btn" title="下移" @click="moveBlock(block.id, 1)">↓</button>
+          <button class="icon-btn danger" title="删除" @click="removeBlock(block.id)">×</button>
+        </div>
+
+        <div class="block-body">
+          <!-- 单据信息：一行一个字段 -->
+          <template v-if="block.type === 'meta'">
+            <div
+              class="meta-row-edit"
+              v-for="(row, ri) in block.rows"
+              :key="ri"
+              @dragover.prevent
+              @drop.prevent="onDropMeta(block, $event)"
+            >
+              <input v-model="row.label" class="input" placeholder="显示名" />
+              <select v-model="row.fieldId" class="input">
+                <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+              </select>
+              <button class="icon-btn danger" @click="removeMetaRow(block, ri)">×</button>
+            </div>
+            <div class="add-row">
+              <button class="btn btn-sm" @click="addMetaRow(block)">＋ 添加字段行</button>
+              <span class="drop-hint">也可把字段拖到这里</span>
+            </div>
+          </template>
+
+          <!-- 明细表：一列一个字段 -->
+          <template v-else-if="block.type === 'table'">
+            <div
+              class="col-row-edit"
+              v-for="(col, ci) in block.columns"
+              :key="ci"
+              @dragover.prevent
+              @drop.prevent="onDropTable(block, $event)"
+            >
+              <input v-model="col.label" class="input" placeholder="列名" />
+              <select v-model="col.fieldId" class="input">
+                <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+              </select>
+              <button class="icon-btn" @click="moveTableColumn(block, ci, -1)">↑</button>
+              <button class="icon-btn" @click="moveTableColumn(block, ci, 1)">↓</button>
+              <button class="icon-btn danger" @click="removeTableColumn(block, ci)">×</button>
+            </div>
+            <div class="add-row">
+              <button class="btn btn-sm" @click="addTableColumn(block)">＋ 添加列</button>
+              <span class="drop-hint">也可把字段拖到这里</span>
+            </div>
+          </template>
+
+          <!-- 文本：可含字段变量 -->
+          <template v-else-if="block.type === 'text'">
+            <textarea
+              class="input textarea"
+              rows="3"
+              placeholder="支持换行；点击上方字段插入变量"
+              :value="block.text"
+              @input="block.text = $event.target.value"
+              @focus="onTextFocus(block.id, $event)"
+              @dragover.prevent
+              @drop.prevent="onDropText(block, $event)"
+            ></textarea>
+            <span class="drop-hint">点击字段 = 插入 {{ token }}，打印时替换成该条记录的值</span>
+          </template>
+
+          <!-- 签名区 -->
+          <template v-else-if="block.type === 'sign'">
+            <div class="sign-edit">
+              <input v-model="block.label" class="input" placeholder="签名区标题" />
+              <label class="check-line">
+                行数
+                <select v-model.number="block.lines" class="input">
+                  <option :value="1">1</option>
+                  <option :value="2">2</option>
+                  <option :value="3">3</option>
+                  <option :value="4">4</option>
+                  <option :value="5">5</option>
+                </select>
+              </label>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <div v-if="!currentTemplate.blocks.length" class="empty">还没有内容块，点击下方按钮添加</div>
+    </div>
+
+    <div class="add-block-row">
+      <button class="btn btn-sm" @click="addBlock('meta')">＋ 单据信息</button>
+      <button class="btn btn-sm" @click="addBlock('table')">＋ 明细表</button>
+      <button class="btn btn-sm" @click="addBlock('text')">＋ 文本</button>
+      <button class="btn btn-sm" @click="addBlock('sign')">＋ 签名区</button>
+    </div>
+
+    <details class="live-preview" open>
+      <summary>实时预览（前 {{ previewRecords.length }} 条记录，打印效果请看“预览打印”页）</summary>
+      <div class="preview-pane">
+        <div class="preview-scale" :style="{ width: 794 * pageScale + 'px', height: 1123 * pageScale + 'px' }">
+          <div
+            class="pages"
+            :style="{ transform: 'scale(' + pageScale + ')', transformOrigin: 'top left' }"
+            v-html="previewHtml"
+          ></div>
+        </div>
+      </div>
+    </details>
+  </section>
+</template>
