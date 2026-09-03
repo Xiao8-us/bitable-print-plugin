@@ -32,7 +32,7 @@ function onGlobalError(e) {
   const raw = e?.error || e?.reason
   const msg = raw?.stack || raw?.message || e?.message || ''
   if (!msg) return
-  ds.error = '运行出错（可复制此信息反馈）：' + String(msg).slice(0, 400)
+  ds.error = '运行出错（可复制此信息反馈）：\n' + String(msg).slice(0, 2000)
 }
 
 async function refresh() {
@@ -113,7 +113,7 @@ function toast(msg, type = 'ok') {
 
     <main class="main">
       <div v-if="ds.error" class="notice notice-warn">
-        {{ ds.error }}
+        <pre class="error-detail">{{ ds.error }}</pre>
         <button class="btn btn-ghost btn-sm" @click="ds.error = ''">知道了</button>
       </div>
 

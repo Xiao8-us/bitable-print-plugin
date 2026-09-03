@@ -197,6 +197,19 @@ body {
   color: #874d00;
 }
 
+.error-detail {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 220px;
+  overflow: auto;
+  flex: 1;
+  color: #874d00;
+  font-family: Consolas, 'Courier New', monospace;
+}
+
 .btn {
   border: 1px solid var(--line);
   background: #fff;
