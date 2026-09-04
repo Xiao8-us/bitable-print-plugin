@@ -120,5 +120,5 @@ export const PRINT_CSS = `
   .sign-block .sign-lines { margin-top: 4px; }
   .sign-block .sign-line { border-bottom: 1px solid #c9cdd4; height: 26px; }
   .page-footer { margin-top: 22px; padding-top: 8px; border-top: 1px solid #e5e6eb; font-size: 9pt; color: #646a73; text-align: center; }
-  .attach-page .attach-item img { width: 100%; height: 122mm; object-fit: contain; }
+  .attach-page .attach-item img { width: 100%; height: 100mm; object-fit: contain; }
 `
