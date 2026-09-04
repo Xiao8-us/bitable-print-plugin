@@ -385,28 +385,27 @@ export function renderAll(template, records) {
     .join('\n')
 }
 
-function buildExpenseRows(lines, declaredAmount, blanksAfter, depRows, leadRows) {
+function buildExpenseRows(lines, declaredAmount, blanksAfter, depRows) {
   const bodyCount = lines.length + blanksAfter
+  const leadRows = bodyCount >= 2 ? bodyCount : 1
   let rows = ''
   for (let i = 0; i < lines.length; i++) {
     const amt = declaredAmount || (lines[i].amount != null ? fmtAmount(lines[i].amount) : '')
     let col3 = ''
     if (i === 0) col3 = `<td class="exp-dep-cell vtext-cell" rowspan="${depRows}">部门主管意见</td>`
-    else if (i >= depRows) col3 = '<td class="exp-opinion-cell"></td>'
     let col4 = ''
-    if (i < depRows) col4 = '<td class="exp-opinion-cell"></td>'
-    else if (i === depRows && depRows < bodyCount)
+    if (i === 0) col4 = '<td class="exp-opinion-cell"></td>'
+    else if (i === 1 && bodyCount >= 2)
       col4 = `<td class="exp-lead-cell vtext-cell" rowspan="${leadRows}">领导审批</td>`
     rows += `<tr class="exp-data"><td class="exp-item">${esc(lines[i].text)}</td><td class="exp-amt">${esc(amt || '')}</td>${col3}${col4}</tr>`
   }
   for (let i = 0; i < blanksAfter; i++) {
     const idx = lines.length + i
     let col3 = ''
-    if (idx >= depRows) col3 = '<td class="exp-opinion-cell"></td>'
     let col4 = ''
-    if (idx < depRows) col4 = '<td class="exp-opinion-cell"></td>'
-    else if (idx === depRows && depRows < bodyCount)
+    if (idx === 1 && bodyCount >= 2) {
       col4 = `<td class="exp-lead-cell vtext-cell" rowspan="${leadRows}">领导审批</td>`
+    }
     rows += `<tr class="exp-blank"><td></td><td></td>${col3}${col4}</tr>`
   }
   return rows
@@ -444,13 +443,13 @@ function expenseFormHtml(template, record) {
   const emptyRows = Math.min(Math.max(Number(cfg.emptyRows) || 3, 0), 6)
   const blanksAfter = autoRows ? Math.max(0, emptyRows - extraBlanks) : emptyRows
 
-  // 审批栏分段：部门主管意见对齐明细上半段，领导审批对齐下半段（含合计行）
+  // 部门主管意见：从第一条明细起占满全部明细行；
+  // 领导审批：从第2行明细起延伸到合计行（行数随明细行数自适应）
   const bodyCount = linesToShow.length + blanksAfter
-  const depRows = Math.max(1, Math.ceil(bodyCount / 2))
-  const leadRows = bodyCount - depRows + 1
-  const dataRows = buildExpenseRows(linesToShow, declaredAmount, blanksAfter, depRows, leadRows)
+  const depRows = Math.max(1, bodyCount)
+  const dataRows = buildExpenseRows(linesToShow, declaredAmount, blanksAfter, depRows)
   const totalRow =
-    depRows >= bodyCount
+    bodyCount === 1
       ? `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-opinion-cell"></td><td class="exp-lead-cell vtext-cell">领导审批</td></tr>`
       : `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-opinion-cell"></td></tr>`
   const capRow = `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="3">${esc(upper)}</td></tr>`

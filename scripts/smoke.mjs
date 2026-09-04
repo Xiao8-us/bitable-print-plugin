@@ -107,6 +107,8 @@ checks.push(['报销单固定版式(A5)', ehtml.includes('page-a5') && ehtml.inc
 checks.push(['元信息映射', ehtml.includes('报销单位：岛链传媒') && ehtml.includes('编号：202605260003')])
 checks.push(['日期格式 yyyy/mm/dd', ehtml.includes('2026/05/26')])
 checks.push(['审批栏分段对齐明细', ehtml.includes('exp-dep-cell') && ehtml.includes('exp-lead-cell') && ehtml.indexOf('部门主管意见') < ehtml.indexOf('领导审批')])
+checks.push(['部门从首行贯穿4行', ehtml.includes('rowspan="4">部门主管意见')])
+checks.push(['领导从第2行到合计(span4)', ehtml.includes('rowspan="4">领导审批')])
 checks.push(['领导审批栏', ehtml.includes('领导审批')])
 checks.push(['金额大写行', ehtml.includes('叁佰元整')])
 checks.push(['合计行', ehtml.includes('合　计')])
