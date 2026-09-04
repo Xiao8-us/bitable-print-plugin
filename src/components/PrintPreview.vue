@@ -9,6 +9,9 @@ const selected = computed(() =>
   ds.records.filter((r) => ds.selectedRecordIds.includes(r.recordId))
 )
 const html = ref('')
+const previewDim = computed(() =>
+  currentTemplate.value?.paper === 'a5' ? { w: 559, h: 793 } : { w: 794, h: 1123 }
+)
 
 async function refresh() {
   const t = currentTemplate.value
@@ -18,6 +21,7 @@ async function refresh() {
     return
   }
   html.value = renderAll(t, recs)
+  updateScale()
   const blocks = collectAttachmentBlocks(t)
   if (!blocks.length) return
   for (const b of blocks) {
@@ -33,7 +37,7 @@ watch(() => [ds.records, ds.selectedRecordIds], refresh, { deep: true })
 
 const pageScale = ref(0.55)
 function updateScale() {
-  pageScale.value = Math.max(0.35, Math.min(1, (window.innerWidth - 40) / 794))
+  pageScale.value = Math.max(0.35, Math.min(1, (window.innerWidth - 40) / previewDim.value.w))
 }
 onMounted(() => {
   updateScale()
@@ -43,7 +47,21 @@ onUnmounted(() => window.removeEventListener('resize', updateScale))
 
 function doPrint() {
   if (!selected.value.length) return
+  ensurePageCss()
   window.print()
+}
+
+function ensurePageCss() {
+  let el = document.getElementById('pp-page-size')
+  if (!el) {
+    el = document.createElement('style')
+    el.id = 'pp-page-size'
+    document.head.appendChild(el)
+  }
+  el.textContent =
+    currentTemplate.value?.paper === 'a5'
+      ? '@page { size: 148mm 210mm; margin: 0; }'
+      : '@page { size: A4; margin: 0; }'
 }
 
 function openPrintWindow() {
@@ -54,8 +72,12 @@ function openPrintWindow() {
     return
   }
   const title = currentTemplate.value?.name || '排版打印'
+  const pageCss =
+    currentTemplate.value?.paper === 'a5'
+      ? '<style>@page { size: 148mm 210mm; margin: 0; }</style>'
+      : ''
   w.document.write(
-    `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${title}</title><style>${PRINT_CSS}</style></head><body>${html.value}</body></html>`
+    `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${title}</title><style>${PRINT_CSS}</style>${pageCss}</head><body>${html.value}</body></html>`
   )
   w.document.close()
   w.focus()
@@ -142,11 +164,11 @@ function exportDocx() {
     <div v-else class="print-pane">
       <div
         class="print-scale"
-        :style="{ width: 794 * pageScale + 'px', height: 1123 * pageScale + 'px' }"
+        :style="{ width: previewDim.w * pageScale + 'px', height: previewDim.h * pageScale + 'px' }"
       >
         <div
           class="print-shell"
-          :style="{ transform: 'scale(' + pageScale + ')', transformOrigin: 'top left' }"
+          :style="{ width: previewDim.w + 'px', transform: 'scale(' + pageScale + ')', transformOrigin: 'top left' }"
           v-html="html"
         ></div>
       </div>

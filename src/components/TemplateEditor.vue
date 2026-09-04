@@ -1,6 +1,5 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { FieldType } from '@lark-base-open/js-sdk'
 import { ds, prepareAttachmentsFor } from '../bitable.js'
 import {
   addBlock,
@@ -30,6 +29,9 @@ const previewRecords = computed(() => {
   return sel.length ? sel : ds.records.slice(0, 3)
 })
 
+const previewDim = computed(() =>
+  currentTemplate.value?.paper === 'a5' ? { w: 559, h: 793 } : { w: 794, h: 1123 }
+)
 const previewHtml = ref('')
 
 async function refreshPreview() {
@@ -40,6 +42,7 @@ async function refreshPreview() {
     return
   }
   previewHtml.value = renderAll(t, recs)
+  updateScale()
   const blocks = collectAttachmentBlocks(t)
   if (!blocks.length) return
   for (const b of blocks) {
@@ -55,13 +58,9 @@ watch(
   { deep: true }
 )
 
-const attachmentFields = computed(() =>
-  ds.fields.filter((f) => f.type === FieldType.Attachment)
-)
-
 const pageScale = ref(0.5)
 function updateScale() {
-  pageScale.value = Math.max(0.3, Math.min(1, (window.innerWidth - 40) / 794))
+  pageScale.value = Math.max(0.3, Math.min(1, (window.innerWidth - 40) / previewDim.value.w))
 }
 onMounted(() => {
   updateScale()
@@ -123,7 +122,7 @@ function onDropText(block, ev) {
 function onDropAttachments(block, ev) {
   ev.preventDefault()
   const fid = ev.dataTransfer.getData('text/plain')
-  const f = ds.fields.find((x) => x.id === fid && x.type === FieldType.Attachment)
+  const f = ds.fields.find((x) => x.id === fid)
   if (f) block.fieldId = f.id
 }
 
@@ -170,7 +169,74 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
       </button>
     </div>
 
-    <div class="field-bar">
+    <div v-if="currentTemplate.kind === 'expense'" class="panel expense-map">
+      <div class="panel-title">固定版式：费用报销单（A5，按样图）</div>
+      <div class="form-grid">
+        <label class="field">
+          <span>报销单位（顶部左）</span>
+          <select class="input" :value="currentTemplate.expense.company" @change="currentTemplate.expense.company = $event.target.value">
+            <option value="">（留空）</option>
+            <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>日期（顶部中）</span>
+          <select class="input" :value="currentTemplate.expense.date" @change="currentTemplate.expense.date = $event.target.value">
+            <option value="">（留空）</option>
+            <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>编号（顶部右）</span>
+          <select class="input" :value="currentTemplate.expense.code" @change="currentTemplate.expense.code = $event.target.value">
+            <option value="">（留空）</option>
+            <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>用途 / 报销事由（明细第一行）</span>
+          <select class="input" :value="currentTemplate.expense.item" @change="currentTemplate.expense.item = $event.target.value">
+            <option value="">（留空）</option>
+            <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>金额（元）（合计/大写用）</span>
+          <select class="input" :value="currentTemplate.expense.amount" @change="currentTemplate.expense.amount = $event.target.value">
+            <option value="">（留空）</option>
+            <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>金额大写（可选）</span>
+          <select class="input" :value="currentTemplate.expense.uppercase" @change="currentTemplate.expense.uppercase = $event.target.value">
+            <option value="">自动换算</option>
+            <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>附件字段（可选，打印在单据后）</span>
+          <select class="input" :value="currentTemplate.expense.attachment" @change="currentTemplate.expense.attachment = $event.target.value">
+            <option value="">不打印附件</option>
+            <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}（{{ f.typeName }}）</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>明细空行数（供手写加行）</span>
+          <select class="input" :value="Number(currentTemplate.expense.emptyRows) || 3" @change="currentTemplate.expense.emptyRows = Number($event.target.value)">
+            <option :value="0">0</option>
+            <option :value="1">1</option>
+            <option :value="2">2</option>
+            <option :value="3">3</option>
+            <option :value="4">4</option>
+            <option :value="5">5</option>
+          </select>
+        </label>
+      </div>
+      <div class="hint">盖章/签字马赛克区域按样图留空；不匹配的字段在这里改一下即可</div>
+    </div>
+
+    <div v-if="currentTemplate.kind !== 'expense'" class="field-bar">
       <span class="field-bar-title">字段（点击插入文本 / 拖入区块）</span>
       <div class="chips scroll-x">
         <span
@@ -187,11 +253,11 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
       </div>
     </div>
 
-    <button class="settings-toggle" @click="showSettings = !showSettings">
+    <button v-if="currentTemplate.kind !== 'expense'" class="settings-toggle" @click="showSettings = !showSettings">
       模板设置（标题 / 纸张 / 模式） {{ showSettings ? '▲' : '▼' }}
     </button>
 
-    <div v-if="showSettings" class="settings">
+    <div v-if="showSettings && currentTemplate.kind !== 'expense'" class="settings">
       <div class="form-grid">
         <label class="field">
           <span>模板名称</span>
@@ -230,7 +296,7 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
       </div>
     </div>
 
-    <div class="blocks">
+    <div v-if="currentTemplate.kind !== 'expense'" class="blocks">
       <div
         v-for="(block, i) in currentTemplate.blocks"
         :key="block.id"
@@ -373,8 +439,10 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
                 :value="block.fieldId"
                 @change="block.fieldId = $event.target.value"
               >
-                <option value="" disabled>选择附件字段…</option>
-                <option v-for="f in attachmentFields" :key="f.id" :value="f.id">{{ f.name }}</option>
+                <option value="" disabled>选择附件/图片字段…</option>
+                <option v-for="f in ds.fields" :key="f.id" :value="f.id">
+                  {{ f.name }}（{{ f.typeName }}）
+                </option>
               </select>
               <label class="check-line">
                 每行
@@ -398,21 +466,21 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
       <div v-if="!currentTemplate.blocks.length" class="empty">还没有内容块，点击下方按钮添加</div>
     </div>
 
-    <div class="add-block-row">
+    <div v-if="currentTemplate.kind !== 'expense'" class="add-block-row">
       <button class="btn btn-sm" @click="addBlock('meta')">＋ 单据信息</button>
       <button class="btn btn-sm" @click="addBlock('table')">＋ 明细表</button>
       <button class="btn btn-sm" @click="addBlock('text')">＋ 文本</button>
       <button class="btn btn-sm" @click="addBlock('sign')">＋ 签名区</button>
-      <button class="btn btn-sm" :disabled="!attachmentFields.length" title="打印记录里的图片附件" @click="addBlock('attachments')">＋ 附件</button>
+      <button class="btn btn-sm" title="打印记录里的图片附件（选附件/图片字段）" @click="addBlock('attachments')">＋ 附件</button>
     </div>
 
     <details class="live-preview" open>
       <summary>实时预览（前 {{ previewRecords.length }} 条记录，打印效果请看“预览打印”页）</summary>
       <div class="preview-pane">
-        <div class="preview-scale" :style="{ width: 794 * pageScale + 'px', height: 1123 * pageScale + 'px' }">
+        <div class="preview-scale" :style="{ width: previewDim.w * pageScale + 'px', height: previewDim.h * pageScale + 'px' }">
           <div
             class="pages"
-            :style="{ transform: 'scale(' + pageScale + ')', transformOrigin: 'top left' }"
+            :style="{ width: previewDim.w + 'px', transform: 'scale(' + pageScale + ')', transformOrigin: 'top left' }"
             v-html="previewHtml"
           ></div>
         </div>

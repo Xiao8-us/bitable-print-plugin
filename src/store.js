@@ -46,81 +46,45 @@ export function looksLikeExpense() {
 }
 
 export function expenseTemplate() {
-  const t = defaultTemplate('费用报销单模板')
-  t.title = '费用报销单'
-  t.subtitle = ''
-  t.blocks = []
   const used = []
-  const take = (aliases) => {
+  const pick = (aliases) => {
     const f = matchField(aliases, used)
     if (!f) return null
     used.push(f.id)
     return f
   }
+  const uppercase = pick(['金额大写', '大写金额'])
+  const company = pick(['报销单位', '单位名称', '单位', '公司'])
+  const date = pick(['报销日期', '报销时间', '日期'])
+  const code = pick(['单据编号', '编号', '单号', '流水号'])
+  const item = pick(['报销事由', '用途', '事由', '费用说明', '说明', '摘要'])
+  const amount = pick(['报销金额', '金额', '合计金额', '总额'])
+  const att =
+    matchField(['附件', '票据', '凭证', '图片', '上传', '发票'], used, [FieldType.Attachment]) ||
+    pick(['附件', '票据', '凭证', '图片', '上传', '发票'])
 
-  // 头部信息：两列一排的表格
-  const headRows = [
-    ['报销人', ['报销人', '申请人', '填报人', '经办人']],
-    ['部门', ['部门', '费用部门']],
-    ['报销日期', ['报销日期', '报销时间', '日期']],
-    ['费用类型', ['费用类型', '费用类别', '类型', '类别']],
-    ['报销金额（元）', ['报销金额', '金额', '总额']],
-    ['单据张数', ['单据张数', '票据张数', '张数']]
-  ]
-    .map(([label, als]) => {
-      const f = take(als)
-      return f ? { label, fieldId: f.id } : null
-    })
-    .filter(Boolean)
-  const head = { id: uid(), type: 'meta', label: '基本信息', bordered: true, rows: headRows }
-  if (head.rows.length) t.blocks.push(head)
-  if (head.rows.length) head.cols = 3
-
-  // 报销事由 / 说明
-  const reason = take(['报销事由', '事由', '用途', '说明', '摘要', '备注'])
-  if (reason) {
-    t.blocks.push({
-      id: uid(),
-      type: 'text',
-      label: '报销事由',
-      text: '{{' + reason.name + '}}',
-      bordered: true
-    })
-  }
-
-  // 费用明细（若表里有多行明细字段，或只有一个费用记录表则作为明细列）
-  const cols = [
-    ['费用日期', ['费用日期', '发生日期', '日期']],
-    ['费用项目', ['费用项目', '项目', '费用项', '事项']],
-    ['金额（元）', ['金额', '费用金额']],
-    ['备注', ['备注', '说明']]
-  ]
-  const columns = cols
-    .map(([label, als]) => {
-      const f = take(als)
-      return f ? { label, fieldId: f.id } : null
-    })
-    .filter(Boolean)
-  if (columns.length) {
-    t.blocks.push({ id: uid(), type: 'table', label: '费用明细', columns })
-  }
-
-  // 审批签字：四栏表格
-  t.blocks.push({
+  const t = {
     id: uid(),
-    type: 'sign',
-    label: '审批签字',
-    lines: 2,
-    columns: ['报销人', '部门负责人', '财务审核', '总经理']
-  })
-
-  // 附件票据：自动绑定附件类字段
-  const att = matchField(['附件', '票据', '凭证', '上传', '图片', '发票'], used, [FieldType.Attachment])
-  if (att) {
-    t.blocks.push({ id: uid(), type: 'attachments', label: '附件票据', fieldId: att.id, perRow: 2 })
+    name: '费用报销单模板',
+    kind: 'expense',
+    paper: 'a5',
+    pageBreak: 'perRecord',
+    title: '费用报销单',
+    subtitle: '',
+    logoUrl: '',
+    blocks: [],
+    footer: '',
+    expense: {
+      company: company?.id || '',
+      date: date?.id || '',
+      code: code?.id || '',
+      item: item?.id || '',
+      amount: amount?.id || '',
+      uppercase: uppercase?.id || '',
+      attachment: att?.id || '',
+      emptyRows: 3
+    }
   }
-
-  t.footer = '感谢您的支持，请妥善保管本单据'
   return t
 }
 
@@ -231,7 +195,8 @@ export function addBlock(type) {
     sign: { label: '签名区', lines: 2 },
     attachments: {
       label: '附件',
-      fieldId: ds.fields.find((f) => f.type === FieldType.Attachment)?.id || '',
+      fieldId:
+        ds.fields.find((f) => f.type === FieldType.Attachment)?.id || ds.fields[0]?.id || '',
       perRow: 2
     }
   }

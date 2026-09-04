@@ -16,7 +16,65 @@ export function fieldName(fid) {
 
 export function collectAttachmentBlocks(template) {
   if (!template) return []
+  if (template.kind === 'expense' && template.expense?.attachment) {
+    return [{ fieldId: template.expense.attachment }]
+  }
   return (template.blocks || []).filter((b) => b.type === 'attachments' && b.fieldId)
+}
+
+function fmtDate(v) {
+  const s = String(v || '').trim()
+  if (!s) return ''
+  return s.replace(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2}).*/, '$1/$2/$3')
+}
+
+const CN_DIGIT = '零壹贰叁肆伍陆柒捌玖'
+const CN_UNIT = ['', '拾', '佰', '仟']
+const CN_BIG = ['', '万', '亿', '兆']
+
+function intToCnUpper(n) {
+  if (n === 0) return '零'
+  const s = String(n)
+  const pad = s.padStart(Math.ceil(s.length / 4) * 4, '0')
+  const groupCount = pad.length / 4
+  let out = ''
+  for (let g = 0; g < groupCount; g++) {
+    const seg = pad.slice(g * 4, g * 4 + 4)
+    const val = Number(seg)
+    if (val === 0) continue
+    let part = ''
+    for (let k = 0; k < 4; k++) {
+      const digit = Number(seg[k])
+      const pos = 3 - k
+      if (digit > 0) {
+        part += CN_DIGIT[digit] + CN_UNIT[pos]
+      } else if (part && !part.endsWith('零')) {
+        part += '零'
+      }
+    }
+    if (part.endsWith('零')) part = part.slice(0, -1)
+    const gi = groupCount - 1 - g
+    if (out) {
+      if (seg[0] === '0' && !out.endsWith('零')) out += '零'
+    }
+    out += part + CN_BIG[gi]
+  }
+  return out
+}
+
+export function amountUpperCn(text) {
+  const clean = String(text ?? '').replace(/[^\d.-]/g, '')
+  const num = parseFloat(clean)
+  if (!isFinite(num) || num < 0 || num > 999999999999) return ''
+  const [intPart, decPart = ''] = String(num.toFixed(2)).split('.')
+  const int = parseInt(intPart, 10)
+  let out = intToCnUpper(int) + '元'
+  const jiao = Number(decPart[0] || 0)
+  const fen = Number(decPart[1] || 0)
+  if (jiao === 0 && fen === 0) return out + '整'
+  if (jiao > 0) out += CN_DIGIT[jiao] + '角'
+  if (fen > 0) out += CN_DIGIT[fen] + '分'
+  return out
 }
 
 function valueFor(record, fid) {
@@ -151,10 +209,80 @@ function renderRecord(template, record, page, pages, allRecords) {
 export function renderAll(template, records) {
   if (!template) return ''
   const list = records || []
+  if (template.kind === 'expense') {
+    if (!list.length) return ''
+    return list
+      .map((r, i) => renderExpense(template, r, i + 1, list.length))
+      .join('\n')
+  }
   if (template.pageBreak === 'continuous') {
     return renderRecord(template, null, 1, 1, list)
   }
   return list
     .map((r, i) => renderRecord(template, r, i + 1, list.length, list))
     .join('\n')
+}
+
+function renderExpense(template, record, page, pages) {
+  const cfg = template.expense || {}
+  const val = (fid) => valueFor(record, fid)
+  const item = val(cfg.item)
+  const amount = val(cfg.amount)
+  const upper = val(cfg.uppercase) || amountUpperCn(amount)
+  const emptyRows = Math.min(Math.max(Number(cfg.emptyRows) || 3, 0), 6)
+
+  let dataRows = ''
+  dataRows += `<tr class="exp-data"><td class="exp-item">${esc(item)}</td><td class="exp-amt">${esc(amount)}</td><td></td><td></td></tr>`
+  for (let i = 0; i < emptyRows; i++) {
+    dataRows += '<tr class="exp-blank"><td></td><td></td><td></td><td></td></tr>'
+  }
+  dataRows += `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(amount)}</td><td></td><td></td></tr>`
+  dataRows += `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="3">${esc(upper)}</td></tr>`
+
+  // 附件图片（若有映射字段）
+  let attachHtml = ''
+  if (cfg.attachment && record) {
+    const cached = attachCache.get(`${record.recordId}|${cfg.attachment}`)
+    const urls = cached?.urls || []
+    if (urls.length) {
+      const figs = urls
+        .map((u) => `<figure class="attach-item"><img src="${esc(u)}" alt="附件" /></figure>`)
+        .join('')
+      attachHtml = `<div class="exp-attach"><div class="exp-sec-title">附件票据</div><div class="attach-grid" style="grid-template-columns:repeat(2,1fr)">${figs}</div></div>`
+    } else if (record.fields?.[cfg.attachment]) {
+      attachHtml = `<div class="exp-attach"><div class="exp-sec-title">附件票据</div><div class="attach-empty">该记录附件无法预览（可能非图片），请在表格中查看</div></div>`
+    }
+  }
+
+  const footer = fillVars(template.footer || '', { page, pages })
+  return `
+<div class="page page-a5">
+  <div class="exp-title-line">
+    <h1 class="page-title">费用报销单</h1>
+  </div>
+  <div class="exp-meta">
+    <span class="exp-meta-item">报销单位：${esc(val(cfg.company))}</span>
+    <span class="exp-meta-date">${esc(fmtDate(val(cfg.date)))}</span>
+    <span class="exp-meta-item">编号：${esc(val(cfg.code))}</span>
+  </div>
+  <table class="exp-table">
+    <thead>
+      <tr>
+        <th class="exp-th-item">用途</th>
+        <th class="exp-th-amt">金额(元)</th>
+        <th class="exp-th-opinion"><span class="vtext">部门主管意见</span></th>
+        <th class="exp-th-leader"></th>
+      </tr>
+    </thead>
+    <tbody>${dataRows}</tbody>
+  </table>
+  <div class="exp-sign">
+    <div class="exp-sign-cell"><span class="exp-sign-label">复核：</span><div class="exp-sign-space"></div></div>
+    <div class="exp-sign-cell"><span class="exp-sign-label">出纳：</span><div class="exp-sign-space"></div></div>
+    <div class="exp-sign-cell"><span class="exp-sign-label">领款人：</span><div class="exp-sign-space"></div></div>
+  </div>
+  ${attachHtml}
+  ${footer ? `<div class="page-footer">${footer}</div>` : ''}
+  <div class="exp-page-no">${page}/${pages}</div>
+</div>`
 }

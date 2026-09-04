@@ -35,6 +35,35 @@ export const PRINT_CSS = `
     position: relative;
   }
   .page:last-child { page-break-after: auto; }
+  .page-a5 { width: 148mm; min-height: 210mm; padding: 8mm 10mm; font-size: 9.5pt; line-height: 1.45; }
+  .page-a5 .page-title { font-size: 17pt; }
+  .exp-title-line { border-bottom: 3px double #1f2329; padding-bottom: 2.5mm; }
+  .exp-title-line .page-title { margin: 0; text-align: center; letter-spacing: 8px; }
+  .exp-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 2.8mm 0 2mm; font-size: 9.5pt; }
+  .exp-meta-item { white-space: nowrap; }
+  .exp-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .exp-table th, .exp-table td { border: 1px solid #1f2329; padding: 1.8mm 1.5mm; vertical-align: middle; word-break: break-all; }
+  .exp-table th { font-weight: 600; font-size: 10pt; text-align: center; }
+  .exp-th-item { width: 34%; }
+  .exp-th-amt { width: 20%; }
+  .exp-th-opinion { width: 22%; }
+  .exp-th-leader { width: 24%; }
+  .vtext { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; }
+  .exp-item { font-size: 9pt; line-height: 1.55; white-space: pre-wrap; }
+  .exp-amt { text-align: right; font-size: 10pt; }
+  .exp-blank td { height: 7.5mm; }
+  .exp-total td { height: 7.5mm; font-weight: 600; }
+  .exp-total-label { text-align: center; letter-spacing: 6px; }
+  .exp-cap-label { text-align: left; font-weight: 600; white-space: nowrap; width: 34%; }
+  .exp-cap-value { letter-spacing: 2px; }
+  .exp-sign { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #1f2329; border-top: 0; }
+  .exp-sign-cell { padding: 2.5mm 3mm; min-height: 17mm; }
+  .exp-sign-cell + .exp-sign-cell { border-left: 1px solid #1f2329; }
+  .exp-sign-label { font-size: 9.5pt; white-space: nowrap; }
+  .exp-sign-space { height: 10mm; }
+  .exp-attach { margin-top: 3mm; }
+  .exp-sec-title { font-weight: 600; font-size: 10pt; margin-bottom: 1.5mm; }
+  .exp-page-no { position: absolute; right: 8mm; bottom: 6mm; font-size: 8pt; color: #646a73; }
   .page-header { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #1f2329; padding-bottom: 10px; margin-bottom: 14px; }
   .logo { height: 44px; max-width: 120px; object-fit: contain; }
   .title-wrap { flex: 1; }
@@ -63,6 +92,7 @@ export const PRINT_CSS = `
   .attach-grid { display: grid; gap: 8px; }
   .attach-item { margin: 0; border: 1px solid #c9cdd4; padding: 4px; background: #fff; break-inside: avoid; }
   .attach-item img { width: 100%; height: 150px; object-fit: contain; display: block; }
+  .page-a5 .attach-item img { height: 95px; }
   .attach-empty { border: 1px dashed #c9cdd4; color: #646a73; font-size: 10pt; padding: 8px 10px; word-break: break-all; }
   .text-block { white-space: pre-wrap; word-break: break-all; }
   .sign-block .sign-lines { margin-top: 4px; }

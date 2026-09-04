@@ -1,5 +1,6 @@
 import { attachCache, ds } from '../src/bitable.js'
-import { renderAll } from '../src/render.js'
+import { amountUpperCn, renderAll } from '../src/render.js'
+import { expenseTemplate } from '../src/store.js'
 
 ds.fields = [
   { id: 'a', name: '订单号', type: 1, isPrimary: true },
@@ -68,6 +69,47 @@ attachCache.set('r1|a', { urls: ['https://example.com/receipt1.png', 'https://ex
 const html4 = renderAll(t4, ds.records)
 checks.push(['每行3字段', html4.includes('form-cols-3')])
 checks.push(['附件图片渲染', html4.includes('receipt1.png') && html4.includes('attach-grid')])
+
+const upperChecks = [
+  ['500', '伍佰元整'],
+  ['500.00', '伍佰元整'],
+  ['100000', '壹拾万元整'],
+  ['1000001', '壹佰万零壹元整'],
+  ['1280.50', '壹仟贰佰捌拾元伍角'],
+  ['0.05', '零元伍分']
+]
+for (const [inp, want] of upperChecks) {
+  checks.push([`大写金额 ${inp}`, amountUpperCn(inp) === want])
+}
+
+ds.tableName = '费用报销单'
+ds.fields = [
+  { id: 'c1', name: '报销单位', type: 1 },
+  { id: 'c2', name: '报销日期', type: 5 },
+  { id: 'c3', name: '单据编号', type: 1 },
+  { id: 'c4', name: '报销事由', type: 1 },
+  { id: 'c5', name: '报销金额', type: 99003 }
+]
+const et = expenseTemplate()
+const ehtml = renderAll(et, [
+  {
+    recordId: 'e1',
+    fields: {
+      c1: '岛链传媒',
+      c2: '2026-05-26 10:00',
+      c3: '202605260003',
+      c4: '5/25 日本直邮报白 300 元',
+      c5: '500.00'
+    }
+  }
+])
+checks.push(['报销单固定版式(A5)', ehtml.includes('page-a5') && ehtml.includes('费用报销单')])
+checks.push(['元信息映射', ehtml.includes('报销单位：岛链传媒') && ehtml.includes('编号：202605260003')])
+checks.push(['日期格式 yyyy/mm/dd', ehtml.includes('2026/05/26')])
+checks.push(['竖排表头', ehtml.includes('vtext')])
+checks.push(['金额大写行', ehtml.includes('伍佰元整')])
+checks.push(['合计行', ehtml.includes('合　计')])
+checks.push(['三栏签字', ehtml.includes('领款人') && ehtml.includes('出纳') && ehtml.includes('复核')])
 
 let failed = false
 for (const [name, ok] of checks) {
