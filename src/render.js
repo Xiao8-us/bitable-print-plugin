@@ -356,9 +356,13 @@ export function renderAll(template, records) {
   const list = records || []
   if (template.kind === 'expense') {
     if (!list.length) return ''
-    return list
-      .map((r, i) => renderExpense(template, r, i + 1, list.length))
-      .join('\n')
+    const flat = []
+    for (const r of list) {
+      flat.push(expenseFormHtml(template, r))
+      const att = expenseAttachHtml(template, r)
+      if (att) flat.push(att)
+    }
+    return flat.map((b, i) => b(i + 1, flat.length)).join('\n')
   }
   if (template.pageBreak === 'continuous') {
     return renderRecord(template, null, 1, 1, list)
@@ -368,7 +372,7 @@ export function renderAll(template, records) {
     .join('\n')
 }
 
-function renderExpense(template, record, page, pages) {
+function expenseFormHtml(template, record) {
   const cfg = template.expense || {}
   const val = (fid) => valueFor(record, fid)
   const itemRaw = String(val(cfg.item) || '')
@@ -407,18 +411,9 @@ function renderExpense(template, record, page, pages) {
   dataRows += `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-opinion-cell"></td></tr>`
   dataRows += `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="2">${esc(upper)}</td></tr>`
 
-  // 附件图片（若有映射字段）
-  let attachHtml = ''
-  if (cfg.attachment && record) {
-    const cached = attachCache.get(`${record.recordId}|${cfg.attachment}`)
-      const inner = attachmentsHtml(record, cfg.attachment, cached, 2, true)
-    if (inner) {
-      attachHtml = `<div class="exp-attach"><div class="exp-sec-title">附件票据</div>${inner}</div>`
-    }
-  }
-
-  const footer = fillVars(template.footer || '', { page, pages })
-  return `
+  return (page, pages) => {
+    const footer = fillVars(template.footer || '', { page, pages })
+    return `
 <div class="page page-a5">
   <div class="exp-title-line">
     <h1 class="page-title">费用报销单</h1>
@@ -448,8 +443,28 @@ function renderExpense(template, record, page, pages) {
     <div class="exp-sign-cell"><span class="exp-sign-label">出纳：</span><div class="exp-sign-space"></div></div>
     <div class="exp-sign-cell"><span class="exp-sign-label">领款人：</span><div class="exp-sign-space"></div></div>
   </div>
-  ${attachHtml}
   ${footer ? `<div class="page-footer">${footer}</div>` : ''}
+  <div class="exp-page-no">${page}/${pages}</div>
+</div>`
+  }
+}
+
+function expenseAttachHtml(template, record) {
+  const cfg = template.expense || {}
+  if (!cfg.attachment || !record) return null
+  const cached = attachCache.get(`${record.recordId}|${cfg.attachment}`)
+  const content = attachmentsHtml(record, cfg.attachment, cached, 3, true)
+  if (!content) return null
+  const val = (fid) => valueFor(record, fid)
+  const serial = extractSerial(record.fields?.[cfg.serialField])
+  const label = val(cfg.code) || serial
+  return (page, pages) => `
+<div class="page page-a5 attach-page">
+  <div class="attach-page-head">
+    <span class="attach-page-title">费用报销单 · 附件票据</span>
+    <span class="attach-page-no-label">编号：${esc(label)}</span>
+  </div>
+  ${content}
   <div class="exp-page-no">${page}/${pages}</div>
 </div>`
 }

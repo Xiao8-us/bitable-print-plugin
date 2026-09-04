@@ -873,6 +873,24 @@ textarea.input {
   margin-bottom: 1.5mm;
 }
 
+.attach-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 2px solid #1f2329;
+  padding-bottom: 2mm;
+  margin-bottom: 4mm;
+}
+
+.attach-page-title {
+  font-weight: 700;
+  font-size: 13pt;
+}
+
+.attach-page-no-label {
+  font-size: 9.5pt;
+}
+
 .exp-page-no {
   position: absolute;
   right: 8mm;

@@ -145,6 +145,28 @@ const ehtml3 = renderAll(et3, [
 checks.push(['结构化明细清洗', ehtml3.includes('购买电梯风扇（8/29）') && !ehtml3.includes('报销内容:') && !ehtml3.includes('CNY')])
 checks.push(['清洗后金额与合计', ehtml3.includes('74.00') && ehtml3.includes('柒拾肆元整')])
 
+// 附件独立成第二页
+const et4 = expenseTemplate()
+et4.expense.attachment = 'x'
+et4.expense.serialField = 'c3'
+et4.expense.approvalUrl = ''
+const ehtml4 = renderAll(et4, [
+  {
+    recordId: 'e4',
+    fields: {
+      c1: '岛链公司',
+      c2: '2026-09-03',
+      c3: '202609030001',
+      c4: '飞书商业专业版升级',
+      c5: '960',
+      x: '[1 个附件](https://www.feishu.cn/approval/admin/previewAttachment?key=ABC)'
+    }
+  }
+])
+const pageCount4 = (ehtml4.match(/class="page /g) || []).length
+checks.push(['附件独立第二页', pageCount4 === 2 && ehtml4.indexOf('附件票据') > ehtml4.indexOf('费用报销单')])
+checks.push(['第一页无附件区', !ehtml4.slice(0, ehtml4.indexOf('page-a5 attach-page')).includes('含审批附件')])
+
 // 通用模板 A5
 const tA5 = JSON.parse(JSON.stringify(t))
 tA5.paper = 'a5'
