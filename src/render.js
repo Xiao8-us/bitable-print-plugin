@@ -389,6 +389,7 @@ export function renderAll(template, records) {
 function expenseFormHtml(template, record) {
   const cfg = template.expense || {}
   const val = (fid) => valueFor(record, fid)
+  const codeShown = extractSerial(val(cfg.code)) || val(cfg.code) || extractSerial(val(cfg.serialField))
   const itemRaw = String(val(cfg.item) || '')
   const declaredAmount = val(cfg.amount)
 
@@ -439,7 +440,7 @@ function expenseFormHtml(template, record) {
   <div class="exp-meta">
     <span class="exp-meta-item">报销单位：${esc(val(cfg.company))}</span>
     <span class="exp-meta-date">${esc(fmtDate(val(cfg.date)))}</span>
-    <span class="exp-meta-item">编号：${esc(val(cfg.code))}</span>
+    <span class="exp-meta-item">编号：${esc(codeShown)}</span>
   </div>
   <table class="exp-table">
     <thead>

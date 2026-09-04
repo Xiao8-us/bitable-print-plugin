@@ -56,10 +56,10 @@ export function expenseTemplate() {
   const uppercase = pick(['金额大写', '大写金额'])
   const company = pick(['报销单位', '单位名称', '单位', '公司'])
   const date = pick(['报销日期', '报销时间', '日期'])
-  const code = pick(['单据编号', '编号', '单号', '流水号'])
+  const code = pick(['单据编号', '编号', '单号', '流水号', '申请编号'])
   const serialF = matchField(['申请编号', '审批编号', '单据编号', '编号'], used)
-  const item = pick(['报销事由', '用途', '事由', '费用说明', '说明', '摘要'])
-  const amount = pick(['报销金额', '金额', '合计金额', '总额'])
+  const item = pick(['报销事由', '费用明细', '明细', '报销内容', '用途', '事由', '费用说明', '说明', '摘要'])
+  const amount = pick(['报销金额', '金额', '费用汇总', '汇总金额', '总额', '合计'])
   const att =
     matchField(['附件', '票据', '凭证', '图片', '上传', '发票'], used, [FieldType.Attachment]) ||
     pick(['附件', '票据', '凭证', '图片', '上传', '发票'])
