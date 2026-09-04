@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { ds } from '../bitable.js'
 import {
   addBlock,
+  addExpenseTemplate,
   addMetaRow,
   addTableColumn,
   createTemplate,
@@ -93,6 +94,19 @@ function onDropText(block, ev) {
   if (f) block.text += '{{' + f.name + '}}'
 }
 
+function signColsText(block) {
+  return (block.columns || []).join('，')
+}
+
+function onSignCols(block, ev) {
+  const arr = String(ev.target.value || '')
+    .split(/[,，]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (arr.length >= 1) block.columns = arr
+  else delete block.columns
+}
+
 const typeTag = { meta: '单', table: '表', text: '文', sign: '签' }
 </script>
 
@@ -113,6 +127,7 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签' }
       </div>
       <button class="btn btn-sm" title="新建模板" @click="createTemplate()">＋</button>
       <button class="btn btn-sm" title="复制当前模板" @click="duplicateTemplate()">⧉</button>
+      <button class="btn btn-sm btn-primary" title="内置费用报销单模板（按字段名自动匹配）" @click="addExpenseTemplate()">报销单</button>
       <button
         class="btn btn-sm btn-danger"
         title="删除当前模板"
@@ -217,6 +232,10 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签' }
               <button class="btn btn-sm" @click="addMetaRow(block)">＋ 添加字段行</button>
               <span class="drop-hint">也可把字段拖到这里</span>
             </div>
+            <label class="check-line">
+              <input v-model="block.bordered" type="checkbox" />
+              表格样式（带边框，两列一排）
+            </label>
           </template>
 
           <!-- 明细表：一列一个字段 -->
@@ -255,6 +274,10 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签' }
               @drop.prevent="onDropText(block, $event)"
             ></textarea>
             <span class="drop-hint">点击字段 = 插入 {{ token }}，打印时替换成该条记录的值</span>
+            <label class="check-line">
+              <input v-model="block.bordered" type="checkbox" />
+              带边框（左侧显示区块名称作为行标题）
+            </label>
           </template>
 
           <!-- 签名区 -->
@@ -272,6 +295,15 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签' }
                 </select>
               </label>
             </div>
+            <div class="sign-edit">
+              <input
+                class="input"
+                :value="signColsText(block)"
+                @change="onSignCols(block, $event)"
+                placeholder="签字栏：如 报销人，部门负责人，财务审核，总经理（留空=整行划线）"
+              />
+            </div>
+            <span class="drop-hint">填多个栏名（顿号/逗号分隔）= 表格形式多栏签字，适合审批流程</span>
           </template>
         </div>
       </div>

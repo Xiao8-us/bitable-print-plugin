@@ -40,6 +40,26 @@ t2.pageBreak = 'continuous'
 const html2 = renderAll(t2, ds.records)
 checks.push(['汇总列表 -> 2 行数据', (html2.match(/<tr>/g) || []).length === 3])
 
+const t3 = JSON.parse(JSON.stringify(t))
+t3.blocks = [
+  {
+    id: 'f1',
+    type: 'meta',
+    label: '基本信息',
+    bordered: true,
+    rows: [
+      { label: '报销人', fieldId: 'b' },
+      { label: '金额', fieldId: 'c' }
+    ]
+  },
+  { id: 'f2', type: 'text', label: '报销事由', text: '{{客户}} 的 {{订单号}}', bordered: true },
+  { id: 'f3', type: 'sign', label: '审批签字', lines: 2, columns: ['报销人', '负责人', '财务', '总经理'] }
+]
+const html3 = renderAll(t3, ds.records)
+checks.push(['表格形式信息区', html3.includes('class="form-table"')])
+checks.push(['四栏签字表', html3.includes('sign-grid') && html3.includes('总经理')])
+checks.push(['带边框事由', html3.includes('form-content-cell')])
+
 let failed = false
 for (const [name, ok] of checks) {
   console.log((ok ? 'PASS' : 'FAIL') + '  ' + name)

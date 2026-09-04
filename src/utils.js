@@ -50,6 +50,14 @@ export const PRINT_CSS = `
   .table-block table { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
   .table-block th, .table-block td { border: 1px solid #c9cdd4; padding: 5px 8px; text-align: left; }
   .table-block th { background: #f2f3f5; font-weight: 600; }
+  .form-block { margin-bottom: 14px; }
+  .form-section-title { font-weight: 600; margin-bottom: 5px; font-size: 11pt; }
+  .form-table { width: 100%; border-collapse: collapse; }
+  .form-table td { border: 1px solid #1f2329; padding: 6px 10px; font-size: 11pt; vertical-align: top; word-break: break-all; }
+  .form-label { width: 86px; background: #f2f3f5; font-weight: 600; text-align: center; white-space: nowrap; }
+  .form-content-cell { white-space: pre-wrap; }
+  .sign-grid td { vertical-align: top; }
+  .sign-cell-label { font-weight: 600; text-align: center; margin-bottom: 8px; }
   .text-block { white-space: pre-wrap; word-break: break-all; }
   .sign-block .sign-lines { margin-top: 4px; }
   .sign-block .sign-line { border-bottom: 1px solid #c9cdd4; height: 26px; }

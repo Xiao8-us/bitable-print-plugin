@@ -34,13 +34,32 @@ function renderRecord(template, record, page, pages, allRecords) {
   let body = ''
   for (const block of template.blocks || []) {
     if (block.type === 'meta') {
-      const rows = (block.rows || [])
+      const items = (block.rows || [])
         .map((r) => {
           const name = fieldName(r.fieldId)
-          return `<div class="meta-row"><span class="meta-label">${esc(r.label || name)}</span><span class="meta-value">${esc(vars[name] ?? '')}</span></div>`
+          return { label: r.label || name, value: vars[name] ?? '' }
         })
-        .join('')
-      if (rows) body += `<div class="block meta-block">${rows}</div>`
+        .filter((r) => r.label)
+      if (!items.length) continue
+      if (block.bordered) {
+        let rows = ''
+        for (let i = 0; i < items.length; i += 2) {
+          const a = items[i]
+          const b = items[i + 1]
+          rows += b
+            ? `<tr><td class="form-label">${esc(a.label)}</td><td>${esc(a.value)}</td><td class="form-label">${esc(b.label)}</td><td>${esc(b.value)}</td></tr>`
+            : `<tr><td class="form-label">${esc(a.label)}</td><td colspan="3">${esc(a.value)}</td></tr>`
+        }
+        body += `<div class="block form-block">${esc(block.label) ? `<div class="form-section-title">${esc(block.label)}</div>` : ''}<table class="form-table"><tbody>${rows}</tbody></table></div>`
+      } else {
+        const rows = items
+          .map(
+            (r) =>
+              `<div class="meta-row"><span class="meta-label">${esc(r.label)}</span><span class="meta-value">${esc(r.value)}</span></div>`
+          )
+          .join('')
+        body += `<div class="block meta-block">${rows}</div>`
+      }
     } else if (block.type === 'table') {
       const cols = block.columns || []
       if (!cols.length) continue
@@ -57,12 +76,29 @@ function renderRecord(template, record, page, pages, allRecords) {
       } else {
         rows = `<tr>${cols.map((c) => `<td>${esc(vars[fieldName(c.fieldId)] ?? '')}</td>`).join('')}</tr>`
       }
-      body += `<div class="block table-block">${esc(block.label || '') ? `<div class="block-title">${esc(block.label)}</div>` : ''}<table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table></div>`
+      body += `<div class="block table-block">${esc(block.label || '') ? `<div class="block-title">${esc(block.label)}</div>` : ''}<table class="list-table"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table></div>`
     } else if (block.type === 'text') {
-      body += `<div class="block text-block">${fillVars(block.text || '', vars)}</div>`
+      const content = fillVars(block.text || '', vars)
+      if (block.bordered && block.label) {
+        body += `<div class="block form-block"><table class="form-table"><tbody><tr><td class="form-label form-label-text">${esc(block.label)}</td><td class="form-content-cell">${content}</td></tr></tbody></table></div>`
+      } else {
+        body += `<div class="block text-block">${content}</div>`
+      }
     } else if (block.type === 'sign') {
-      const lines = '<div class="sign-line"></div>'.repeat(Math.max(1, Number(block.lines) || 2))
-      body += `<div class="block sign-block">${esc(block.label || '签名') ? `<div class="block-title">${esc(block.label)}</div>` : ''}<div class="sign-lines">${lines}</div></div>`
+      const lineCount = Math.max(1, Number(block.lines) || 2)
+      const cols = Array.isArray(block.columns) && block.columns.length ? block.columns : null
+      if (cols) {
+        const cells = cols
+          .map(
+            (c) =>
+              `<td class="sign-cell"><div class="sign-cell-label">${esc(c)}</div><div class="sign-cell-space">${'<div class="sign-line"></div>'.repeat(lineCount)}</div></td>`
+          )
+          .join('')
+        body += `<div class="block form-block"><table class="form-table sign-grid"><tbody><tr>${cells}</tr></tbody></table></div>`
+      } else {
+        const lines = '<div class="sign-line"></div>'.repeat(lineCount)
+        body += `<div class="block sign-block">${esc(block.label || '签名') ? `<div class="block-title">${esc(block.label)}</div>` : ''}<div class="sign-lines">${lines}</div></div>`
+      }
     }
   }
 
