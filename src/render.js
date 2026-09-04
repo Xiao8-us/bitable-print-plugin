@@ -387,26 +387,23 @@ export function renderAll(template, records) {
 
 function buildExpenseRows(lines, declaredAmount, blanksAfter, depRows) {
   const bodyCount = lines.length + blanksAfter
-  const leadRows = bodyCount >= 2 ? bodyCount : 1
+  const leadRows = bodyCount - depRows + 1
   let rows = ''
   for (let i = 0; i < lines.length; i++) {
     const amt = declaredAmount || (lines[i].amount != null ? fmtAmount(lines[i].amount) : '')
     let col3 = ''
     if (i === 0) col3 = `<td class="exp-dep-cell vtext-cell" rowspan="${depRows}">部门主管意见</td>`
-    let col4 = ''
-    if (i === 0) col4 = '<td class="exp-opinion-cell"></td>'
-    else if (i === 1 && bodyCount >= 2)
-      col4 = `<td class="exp-lead-cell vtext-cell" rowspan="${leadRows}">领导审批</td>`
-    rows += `<tr class="exp-data"><td class="exp-item">${esc(lines[i].text)}</td><td class="exp-amt">${esc(amt || '')}</td>${col3}${col4}</tr>`
+    else if (i === depRows && depRows < bodyCount)
+      col3 = `<td class="exp-lead-cell vtext-cell" rowspan="${leadRows}">领导审批</td>`
+    rows += `<tr class="exp-data"><td class="exp-item">${esc(lines[i].text)}</td><td class="exp-amt">${esc(amt || '')}</td>${col3}</tr>`
   }
   for (let i = 0; i < blanksAfter; i++) {
     const idx = lines.length + i
     let col3 = ''
-    let col4 = ''
-    if (idx === 1 && bodyCount >= 2) {
-      col4 = `<td class="exp-lead-cell vtext-cell" rowspan="${leadRows}">领导审批</td>`
+    if (idx === depRows && depRows < bodyCount) {
+      col3 = `<td class="exp-lead-cell vtext-cell" rowspan="${leadRows}">领导审批</td>`
     }
-    rows += `<tr class="exp-blank"><td></td><td></td>${col3}${col4}</tr>`
+    rows += `<tr class="exp-blank"><td></td><td></td>${col3}</tr>`
   }
   return rows
 }
@@ -443,16 +440,17 @@ function expenseFormHtml(template, record) {
   const emptyRows = Math.min(Math.max(Number(cfg.emptyRows) || 3, 0), 6)
   const blanksAfter = autoRows ? Math.max(0, emptyRows - extraBlanks) : emptyRows
 
-  // 部门主管意见：从第一条明细起占满全部明细行；
-  // 领导审批：从第2行明细起延伸到合计行（行数随明细行数自适应）
+  // 右侧审批区单个列：部门主管意见占上半（含首条明细），
+  // 领导审批紧接其下直到合计行；两块无间隙、随明细行数自适应均分
   const bodyCount = linesToShow.length + blanksAfter
-  const depRows = Math.max(1, bodyCount)
+  const depRows = Math.max(1, Math.ceil(bodyCount / 2))
+  const leadRows = bodyCount - depRows + 1
   const dataRows = buildExpenseRows(linesToShow, declaredAmount, blanksAfter, depRows)
   const totalRow =
-    bodyCount === 1
-      ? `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-opinion-cell"></td><td class="exp-lead-cell vtext-cell">领导审批</td></tr>`
-      : `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-opinion-cell"></td></tr>`
-  const capRow = `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="3">${esc(upper)}</td></tr>`
+    depRows >= bodyCount
+      ? `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-lead-cell vtext-cell">领导审批</td></tr>`
+      : `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td></tr>`
+  const capRow = `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="2">${esc(upper)}</td></tr>`
 
   return (page, pages) => {
     const footer = fillVars(template.footer || '', { page, pages })
@@ -471,7 +469,6 @@ function expenseFormHtml(template, record) {
       <tr>
         <th class="exp-th-item">用途</th>
         <th class="exp-th-amt">金额(元)</th>
-        <th class="exp-th-approve"></th>
         <th class="exp-th-approve"></th>
       </tr>
     </thead>

@@ -44,9 +44,9 @@ export const PRINT_CSS = `
   .exp-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   .exp-table th, .exp-table td { border: 1px solid #1f2329; padding: 1.8mm 1.5mm; vertical-align: middle; word-break: break-all; }
   .exp-table th { font-weight: 600; font-size: 10pt; text-align: center; }
-  .exp-th-item { width: 46%; }
-  .exp-th-amt { width: 18%; }
-  .exp-th-approve { width: 18%; }
+  .exp-th-item { width: 44%; }
+  .exp-th-amt { width: 20%; }
+  .exp-th-approve { width: 36%; }
   .vtext-cell { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 1px; font-size: 9pt; text-align: center; vertical-align: middle; }
   .exp-dep-cell, .exp-lead-cell { font-weight: 600; padding: 2mm 0; }
   .exp-opinion-cell { height: 7.5mm; }
