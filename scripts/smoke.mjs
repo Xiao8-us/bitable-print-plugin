@@ -129,6 +129,26 @@ checks.push(['长明细自动分行2行', (ehtml2.match(/exp-data/g) || []).leng
 checks.push(['每行金额拆出', ehtml2.includes('300.00') && ehtml2.includes('200.00')])
 checks.push(['自动合计并转大写', ehtml2.includes('伍佰元整') && ehtml2.includes('500.00')])
 
+// 通用模板 A5
+const tA5 = JSON.parse(JSON.stringify(t))
+tA5.paper = 'a5'
+checks.push(['通用模板选A5生效', renderAll(tA5, ds.records).includes('page-a5')])
+
+// 附件：审批网页链接 → 文字条目；图片直链 → 从左到右排列图片
+const attachBlock = { id: 'ax', type: 'attachments', label: '附件', fieldId: 'x', perRow: 2 }
+const recA = {
+  recordId: 'ra',
+  fields: { x: '[2 个附件](https://www.feishu.cn/approval/admin/previewAttachment?key=ABC)' }
+}
+const htmlA = renderAll({ ...tA5, blocks: [attachBlock] }, [recA])
+checks.push(['审批网页附件显示条目', htmlA.includes('attach-link') && htmlA.includes('previewAttachment')])
+const recB = {
+  recordId: 'rb',
+  fields: { x: 'https://cdn.example.com/r1.png\nhttps://cdn.example.com/r2.jpg' }
+}
+const htmlB = renderAll({ ...tA5, blocks: [attachBlock] }, [recB])
+checks.push(['图片直链多张横排', (htmlB.match(/<img /g) || []).length === 2 && htmlB.includes('r1.png') && htmlB.includes('r2.jpg')])
+
 let failed = false
 for (const [name, ok] of checks) {
   console.log((ok ? 'PASS' : 'FAIL') + '  ' + name)

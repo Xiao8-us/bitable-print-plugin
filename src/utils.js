@@ -93,6 +93,20 @@ export const PRINT_CSS = `
   .attach-item { margin: 0; border: 1px solid #c9cdd4; padding: 4px; background: #fff; break-inside: avoid; }
   .attach-item img { width: 100%; height: 150px; object-fit: contain; display: block; }
   .page-a5 .attach-item img { height: 95px; }
+  .page-a5 .page-header { padding-bottom: 4mm; margin-bottom: 3mm; }
+  .page-a5 .page-title { font-size: 16pt; }
+  .page-a5 .page-subtitle, .page-a5 .header-meta { font-size: 8.5pt; }
+  .page-a5 .block { margin-bottom: 8px; }
+  .page-a5 .block-title, .page-a5 .form-section-title { font-size: 10pt; }
+  .page-a5 .form-table td { font-size: 9.5pt; padding: 4px 6px; }
+  .page-a5 .form-label { width: 62px; font-size: 9pt; }
+  .page-a5 .form-cols-3 .form-label, .page-a5 .form-cols-4 .form-label { font-size: 8.5pt; min-width: 30px; }
+  .page-a5 .table-block table { font-size: 9pt; }
+  .page-a5 .table-block th, .page-a5 .table-block td { padding: 3px 5px; }
+  .page-a5 .meta-row, .page-a5 .text-block { font-size: 9.5pt; }
+  .page-a5 .sign-line { height: 18px; }
+  .attach-links { border: 1px dashed #c9cdd4; padding: 4px 8px; }
+  .attach-link { font-size: 8.5pt; color: #333; word-break: break-all; line-height: 1.5; }
   .attach-empty { border: 1px dashed #c9cdd4; color: #646a73; font-size: 10pt; padding: 8px 10px; word-break: break-all; }
   .text-block { white-space: pre-wrap; word-break: break-all; }
   .sign-block .sign-lines { margin-top: 4px; }

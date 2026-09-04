@@ -56,6 +56,75 @@ function fmtAmount(n) {
   return Number(n).toFixed(2)
 }
 
+const IMG_EXT = /\.(png|jpe?g|gif|webp|bmp|svg)$/i
+
+function isImgUrl(u) {
+  const p = String(u || '').split('?')[0].split('#')[0].toLowerCase()
+  return IMG_EXT.test(p)
+}
+
+function extractLinkAttachments(raw) {
+  const s = String(raw || '')
+  const out = []
+  const mdRe = /\[([^\]]*)\]\(\s*(https?:\/\/[^)\s]+)\s*\)/g
+  let m
+  while ((m = mdRe.exec(s))) {
+    const name = (m[1] || '').trim() || '附件'
+    if (!out.some((o) => o.url === m[2])) out.push({ name, url: m[2] })
+  }
+  if (!out.length) {
+    const urlRe = /https?:\/\/[^\s)\]]+/g
+    let u
+    while ((u = urlRe.exec(s))) {
+      if (!out.some((o) => o.url === u[0])) out.push({ name: '附件', url: u[0] })
+    }
+  }
+  return out
+}
+
+function shortUrl(u) {
+  return String(u).replace(/^https?:\/\//, '').slice(0, 90)
+}
+
+function attachmentsHtml(record, fieldId, cached, perRow) {
+  if (!record || !fieldId) return ''
+  const raw = record.fields?.[fieldId]
+  let items = []
+  if (cached?.urls?.length) {
+    items = cached.urls.map((u) => ({ url: u, kind: 'img' }))
+  } else {
+    items = extractLinkAttachments(raw).map((o) => ({
+      url: o.url,
+      kind: isImgUrl(o.url) ? 'img' : 'link',
+      name: o.name
+    }))
+  }
+  if (!items.length) {
+    return raw
+      ? `<div class="attach-empty">附件无法预览：${esc(String(raw).slice(0, 80))}</div>`
+      : ''
+  }
+  const imgs = items.filter((i) => i.kind === 'img')
+  const links = items.filter((i) => i.kind === 'link')
+  const grid = imgs.length
+    ? `<div class="attach-grid" style="grid-template-columns:repeat(${perRow},1fr)">${imgs
+        .map(
+          (i) =>
+            `<figure class="attach-item"><img src="${esc(i.url)}" alt="附件" /></figure>`
+        )
+        .join('')}</div>`
+    : ''
+  const linkBlock = links.length
+    ? `<div class="attach-links">${links
+        .map(
+          (l, i) =>
+            `<div class="attach-link">${esc(l.name || '附件' + (i + 1))}：${esc(shortUrl(l.url))}</div>`
+        )
+        .join('')}</div>`
+    : ''
+  return grid + linkBlock
+}
+
 const CN_DIGIT = '零壹贰叁肆伍陆柒捌玖'
 const CN_UNIT = ['', '拾', '佰', '仟']
 const CN_BIG = ['', '万', '亿', '兆']
@@ -183,18 +252,7 @@ function renderRecord(template, record, page, pages, allRecords) {
     } else if (block.type === 'attachments') {
       const perRow = Math.min(Math.max(Number(block.perRow) || 2, 1), 4)
       const cached = record ? attachCache.get(`${record.recordId}|${block.fieldId}`) : null
-      const urls = cached?.urls || []
-      const nonImages = cached?.nonImages || 0
-      let content = ''
-      if (urls.length) {
-        const figs = urls
-          .map((u) => `<figure class="attach-item"><img src="${esc(u)}" alt="附件" /></figure>`)
-          .join('')
-        content = `<div class="attach-grid" style="grid-template-columns:repeat(${perRow},1fr)">${figs}</div>`
-      } else if (record && record.fields?.[block.fieldId]) {
-        const hint = String(record.fields[block.fieldId]).slice(0, 60)
-        content = `<div class="attach-empty">${nonImages ? '含非图片附件' : '未取到图片附件'}：${esc(hint)}</div>`
-      }
+      const content = attachmentsHtml(record, block.fieldId, cached, perRow)
       if (content) {
         body += `<div class="block form-block attach-block">${esc(block.label) ? `<div class="form-section-title">${esc(block.label)}</div>` : ''}${content}</div>`
       }
@@ -219,8 +277,9 @@ function renderRecord(template, record, page, pages, allRecords) {
   const logo = template.logoUrl
     ? `<img class="logo" src="${esc(template.logoUrl)}" alt="logo" />`
     : ''
+  const pageCls = template.paper === 'a5' ? 'page page-a5' : 'page'
   return `
-<div class="page">
+<div class="${pageCls}">
   <div class="page-header">
     ${logo}
     <div class="title-wrap">
@@ -293,14 +352,9 @@ function renderExpense(template, record, page, pages) {
   let attachHtml = ''
   if (cfg.attachment && record) {
     const cached = attachCache.get(`${record.recordId}|${cfg.attachment}`)
-    const urls = cached?.urls || []
-    if (urls.length) {
-      const figs = urls
-        .map((u) => `<figure class="attach-item"><img src="${esc(u)}" alt="附件" /></figure>`)
-        .join('')
-      attachHtml = `<div class="exp-attach"><div class="exp-sec-title">附件票据</div><div class="attach-grid" style="grid-template-columns:repeat(2,1fr)">${figs}</div></div>`
-    } else if (record.fields?.[cfg.attachment]) {
-      attachHtml = `<div class="exp-attach"><div class="exp-sec-title">附件票据</div><div class="attach-empty">该记录附件无法预览（可能非图片），请在表格中查看</div></div>`
+    const inner = attachmentsHtml(record, cfg.attachment, cached, 2)
+    if (inner) {
+      attachHtml = `<div class="exp-attach"><div class="exp-sec-title">附件票据</div>${inner}</div>`
     }
   }
 
