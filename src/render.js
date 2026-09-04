@@ -385,27 +385,40 @@ export function renderAll(template, records) {
     .join('\n')
 }
 
-function buildExpenseRows(lines, declaredAmount, blanksAfter, depRows) {
+function buildExpenseRows(lines, declaredAmount, blanksAfter, depRows, total) {
   const bodyCount = lines.length + blanksAfter
-  const leadRows = bodyCount - depRows + 1
-  let rows = ''
-  for (let i = 0; i < lines.length; i++) {
-    const amt = declaredAmount || (lines[i].amount != null ? fmtAmount(lines[i].amount) : '')
-    let col3 = ''
-    if (i === 0) col3 = `<td class="exp-dep-cell vtext-cell" rowspan="${depRows}">部门主管意见</td>`
-    else if (i === depRows && depRows < bodyCount)
-      col3 = `<td class="exp-lead-cell vtext-cell" rowspan="${leadRows}">领导审批</td>`
-    rows += `<tr class="exp-data"><td class="exp-item">${esc(lines[i].text)}</td><td class="exp-amt">${esc(amt || '')}</td>${col3}</tr>`
-  }
+  const U = depRows
+  const blankA = U >= 2 ? U - 1 : 0
+  const blankB = bodyCount - U - 1 // 领导标签之后、合计之前的明细行数
+  const bodyTexts = lines.map((l) => ({
+    cls: 'exp-data',
+    item: esc(l.text),
+    amt: esc((declaredAmount || (l.amount != null ? fmtAmount(l.amount) : '')) || '')
+  }))
   for (let i = 0; i < blanksAfter; i++) {
-    const idx = lines.length + i
-    let col3 = ''
-    if (idx === depRows && depRows < bodyCount) {
-      col3 = `<td class="exp-lead-cell vtext-cell" rowspan="${leadRows}">领导审批</td>`
-    }
-    rows += `<tr class="exp-blank"><td></td><td></td>${col3}</tr>`
+    bodyTexts.push({ cls: 'exp-blank', item: '', amt: '' })
   }
-  return rows
+  let rows = ''
+  bodyTexts.forEach((b, i) => {
+    let col = ''
+    if (i === 0) col = '<td class="exp-label-cell">部门主管意见</td>'
+    else if (i === 1 && blankA > 0)
+      col = `<td class="exp-blank-box" rowspan="${blankA}"></td>`
+    else if (i === U && U > 0 && U < bodyCount)
+      col = '<td class="exp-label-cell">领导审批</td>'
+    else if (i === U + 1 && blankB > 0)
+      col = `<td class="exp-blank-box" rowspan="${blankB + 1}"></td>`
+    rows += `<tr class="${b.cls}"><td class="exp-item">${b.item}</td><td class="exp-amt">${b.amt}</td>${col}</tr>`
+  })
+  let totalRow
+  if (U >= bodyCount) {
+    totalRow = `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-label-cell">领导审批</td></tr>`
+  } else if (blankB === 0) {
+    totalRow = `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-blank-box"></td></tr>`
+  } else {
+    totalRow = `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td></tr>`
+  }
+  return { rows, totalRow }
 }
 
 function expenseFormHtml(template, record) {
@@ -448,12 +461,15 @@ function expenseFormHtml(template, record) {
     manualDep >= 1
       ? Math.min(Math.floor(manualDep), bodyCount)
       : Math.max(1, Math.ceil(bodyCount / 2))
-  const leadRows = bodyCount - depRows + 1
-  const dataRows = buildExpenseRows(linesToShow, declaredAmount, blanksAfter, depRows)
-  const totalRow =
-    depRows >= bodyCount
-      ? `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-lead-cell vtext-cell">领导审批</td></tr>`
-      : `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td></tr>`
+  const builtRows = buildExpenseRows(
+    linesToShow,
+    declaredAmount,
+    blanksAfter,
+    depRows,
+    total
+  )
+  const dataRows = builtRows.rows
+  const totalRow = builtRows.totalRow
   const capRow = `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="2">${esc(upper)}</td></tr>`
 
   return (page, pages) => {

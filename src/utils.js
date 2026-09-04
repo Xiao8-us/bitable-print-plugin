@@ -50,6 +50,8 @@ export const PRINT_CSS = `
   .vtext-cell { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 1px; font-size: 9pt; text-align: center; vertical-align: middle; }
   .exp-dep-cell, .exp-lead-cell { font-weight: 600; padding: 2mm 0; }
   .exp-opinion-cell { height: 7.5mm; }
+  .exp-label-cell { font-size: 9pt; font-weight: 600; text-align: center; vertical-align: middle; }
+  .exp-blank-box { min-height: 7.5mm; }
   .vtext { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; }
   .exp-item { font-size: 9pt; line-height: 1.55; white-space: pre-wrap; }
   .exp-amt { text-align: right; font-size: 10pt; }
