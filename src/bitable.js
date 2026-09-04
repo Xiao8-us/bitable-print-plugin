@@ -53,6 +53,10 @@ export const ds = reactive({
 let activeTable = null
 let token = 0
 
+// 附件 URL 缓存：key = `${recordId}|${fieldId}`，value = { urls, nonImages }
+// 放普通 Map（不进响应式），由组件取完后手动刷新渲染
+export const attachCache = new Map()
+
 function sanitizeRecord(r) {
   return {
     recordId: r.recordId,
@@ -281,5 +285,48 @@ export async function selectVisibleRecords() {
     await ensureRecords(ds.selectedRecordIds)
   } catch (e) {
     ds.error = '读取当前视图记录失败：' + (e?.message || e)
+  }
+}
+
+export async function fetchRecordAttachments(fieldId, recordId) {
+  const key = `${recordId}|${fieldId}`
+  if (attachCache.has(key)) return attachCache.get(key)
+  const empty = { urls: [], nonImages: 0 }
+  if (!ds.connected || !activeTable || !fieldId || !recordId) {
+    attachCache.set(key, empty)
+    return empty
+  }
+  try {
+    const value = await activeTable.getCellValue(fieldId, recordId)
+    const list = Array.isArray(value) ? value : []
+    const tokens = list.map((a) => a?.token).filter(Boolean)
+    const urls = tokens.length
+      ? await activeTable.getCellAttachmentUrls(tokens, fieldId, recordId)
+      : []
+    const urlsArr = Array.isArray(urls) ? urls : []
+    const imgUrls = []
+    let nonImages = 0
+    urlsArr.forEach((u, i) => {
+      const meta = list[i]
+      const mime = String(meta?.type || '').toLowerCase()
+      const ext = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(u.split('?')[0])
+      if (ext || mime.includes('image/')) imgUrls.push(u)
+      else nonImages++
+    })
+    const result = { urls: imgUrls, nonImages }
+    attachCache.set(key, result)
+    return result
+  } catch (e) {
+    attachCache.set(key, empty)
+    return empty
+  }
+}
+
+export async function prepareAttachmentsFor(fieldId, recordIds) {
+  const need = [...new Set((recordIds || []).filter(Boolean))]
+  for (const id of need) {
+    if (!attachCache.has(`${id}|${fieldId}`)) {
+      await fetchRecordAttachments(fieldId, id)
+    }
   }
 }

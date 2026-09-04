@@ -1,4 +1,4 @@
-import { ds } from '../src/bitable.js'
+import { attachCache, ds } from '../src/bitable.js'
 import { renderAll } from '../src/render.js'
 
 ds.fields = [
@@ -59,6 +59,15 @@ const html3 = renderAll(t3, ds.records)
 checks.push(['表格形式信息区', html3.includes('class="form-table"')])
 checks.push(['四栏签字表', html3.includes('sign-grid') && html3.includes('总经理')])
 checks.push(['带边框事由', html3.includes('form-content-cell')])
+
+const t4 = JSON.parse(JSON.stringify(t3))
+t4.blocks[0].cols = 3
+t4.blocks[0].valueAlign = 'center'
+t4.blocks.push({ id: 'at1', type: 'attachments', label: '附件票据', fieldId: 'a', perRow: 2 })
+attachCache.set('r1|a', { urls: ['https://example.com/receipt1.png', 'https://example.com/receipt2.jpg'], nonImages: 0 })
+const html4 = renderAll(t4, ds.records)
+checks.push(['每行3字段', html4.includes('form-cols-3')])
+checks.push(['附件图片渲染', html4.includes('receipt1.png') && html4.includes('attach-grid')])
 
 let failed = false
 for (const [name, ok] of checks) {

@@ -55,9 +55,15 @@ export const PRINT_CSS = `
   .form-table { width: 100%; border-collapse: collapse; }
   .form-table td { border: 1px solid #1f2329; padding: 6px 10px; font-size: 11pt; vertical-align: top; word-break: break-all; }
   .form-label { width: 86px; background: #f2f3f5; font-weight: 600; text-align: center; white-space: nowrap; }
+  .form-cols-1 .form-label { width: 130px; }
+  .form-cols-3 .form-label, .form-cols-4 .form-label { white-space: normal; font-size: 10pt; width: auto; min-width: 44px; }
   .form-content-cell { white-space: pre-wrap; }
   .sign-grid td { vertical-align: top; }
   .sign-cell-label { font-weight: 600; text-align: center; margin-bottom: 8px; }
+  .attach-grid { display: grid; gap: 8px; }
+  .attach-item { margin: 0; border: 1px solid #c9cdd4; padding: 4px; background: #fff; break-inside: avoid; }
+  .attach-item img { width: 100%; height: 150px; object-fit: contain; display: block; }
+  .attach-empty { border: 1px dashed #c9cdd4; color: #646a73; font-size: 10pt; padding: 8px 10px; word-break: break-all; }
   .text-block { white-space: pre-wrap; word-break: break-all; }
   .sign-block .sign-lines { margin-top: 4px; }
   .sign-block .sign-line { border-bottom: 1px solid #c9cdd4; height: 26px; }

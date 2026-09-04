@@ -1,6 +1,7 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { ds } from '../bitable.js'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { FieldType } from '@lark-base-open/js-sdk'
+import { ds, prepareAttachmentsFor } from '../bitable.js'
 import {
   addBlock,
   addExpenseTemplate,
@@ -17,7 +18,7 @@ import {
   removeTemplate,
   store
 } from '../store.js'
-import { renderAll } from '../render.js'
+import { collectAttachmentBlocks, renderAll } from '../render.js'
 
 const showSettings = ref(false)
 const focusedBlockId = ref('')
@@ -29,8 +30,33 @@ const previewRecords = computed(() => {
   return sel.length ? sel : ds.records.slice(0, 3)
 })
 
-const previewHtml = computed(() =>
-  currentTemplate.value ? renderAll(currentTemplate.value, previewRecords.value) : ''
+const previewHtml = ref('')
+
+async function refreshPreview() {
+  const t = currentTemplate.value
+  const recs = previewRecords.value
+  if (!t) {
+    previewHtml.value = ''
+    return
+  }
+  previewHtml.value = renderAll(t, recs)
+  const blocks = collectAttachmentBlocks(t)
+  if (!blocks.length) return
+  for (const b of blocks) {
+    await prepareAttachmentsFor(b.fieldId, recs.slice(0, 8).map((r) => r.recordId))
+  }
+  previewHtml.value = renderAll(t, previewRecords.value)
+}
+
+watch(currentTemplate, refreshPreview, { deep: true, immediate: true })
+watch(
+  () => [ds.records, ds.selectedRecordIds],
+  refreshPreview,
+  { deep: true }
+)
+
+const attachmentFields = computed(() =>
+  ds.fields.filter((f) => f.type === FieldType.Attachment)
 )
 
 const pageScale = ref(0.5)
@@ -94,6 +120,13 @@ function onDropText(block, ev) {
   if (f) block.text += '{{' + f.name + '}}'
 }
 
+function onDropAttachments(block, ev) {
+  ev.preventDefault()
+  const fid = ev.dataTransfer.getData('text/plain')
+  const f = ds.fields.find((x) => x.id === fid && x.type === FieldType.Attachment)
+  if (f) block.fieldId = f.id
+}
+
 function signColsText(block) {
   return (block.columns || []).join('，')
 }
@@ -107,7 +140,7 @@ function onSignCols(block, ev) {
   else delete block.columns
 }
 
-const typeTag = { meta: '单', table: '表', text: '文', sign: '签' }
+const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachments: '附' }
 </script>
 
 <template>
@@ -234,8 +267,34 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签' }
             </div>
             <label class="check-line">
               <input v-model="block.bordered" type="checkbox" />
-              表格样式（带边框，两列一排）
+              表格样式（带边框）
             </label>
+            <div v-if="block.bordered" class="sign-edit">
+              <label class="check-line">
+                每行字段数
+                <select
+                  class="input"
+                  :value="Number(block.cols) || 2"
+                  @change="block.cols = Number($event.target.value)"
+                >
+                  <option :value="1">1 个</option>
+                  <option :value="2">2 个</option>
+                  <option :value="3">3 个</option>
+                  <option :value="4">4 个</option>
+                </select>
+              </label>
+              <label class="check-line">
+                数值对齐
+                <select
+                  class="input"
+                  :value="block.valueAlign || 'left'"
+                  @change="block.valueAlign = $event.target.value"
+                >
+                  <option value="left">靠左</option>
+                  <option value="center">居中</option>
+                </select>
+              </label>
+            </div>
           </template>
 
           <!-- 明细表：一列一个字段 -->
@@ -305,6 +364,34 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签' }
             </div>
             <span class="drop-hint">填多个栏名（顿号/逗号分隔）= 表格形式多栏签字，适合审批流程</span>
           </template>
+
+          <!-- 附件 -->
+          <template v-else-if="block.type === 'attachments'">
+            <div class="sign-edit" @dragover.prevent @drop.prevent="onDropAttachments(block, $event)">
+              <select
+                class="input"
+                :value="block.fieldId"
+                @change="block.fieldId = $event.target.value"
+              >
+                <option value="" disabled>选择附件字段…</option>
+                <option v-for="f in attachmentFields" :key="f.id" :value="f.id">{{ f.name }}</option>
+              </select>
+              <label class="check-line">
+                每行
+                <select
+                  class="input"
+                  :value="Number(block.perRow) || 2"
+                  @change="block.perRow = Number($event.target.value)"
+                >
+                  <option :value="1">1 张</option>
+                  <option :value="2">2 张</option>
+                  <option :value="3">3 张</option>
+                  <option :value="4">4 张</option>
+                </select>
+              </label>
+            </div>
+            <span class="drop-hint">附件字段可直接拖到这里；打印时自动读取图片附件</span>
+          </template>
         </div>
       </div>
 
@@ -316,6 +403,7 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签' }
       <button class="btn btn-sm" @click="addBlock('table')">＋ 明细表</button>
       <button class="btn btn-sm" @click="addBlock('text')">＋ 文本</button>
       <button class="btn btn-sm" @click="addBlock('sign')">＋ 签名区</button>
+      <button class="btn btn-sm" :disabled="!attachmentFields.length" title="打印记录里的图片附件" @click="addBlock('attachments')">＋ 附件</button>
     </div>
 
     <details class="live-preview" open>

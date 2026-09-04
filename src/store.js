@@ -1,4 +1,5 @@
 import { computed, reactive, watch } from 'vue'
+import { FieldType } from '@lark-base-open/js-sdk'
 import { ds } from './bitable.js'
 import { download, uid } from './utils.js'
 
@@ -23,10 +24,11 @@ export function defaultTemplate(name = '未命名模板') {
 
 const norm = (s) => String(s || '').toLowerCase().trim()
 
-export function matchField(aliases, excludeIds = []) {
+export function matchField(aliases, excludeIds = [], types = null) {
   const lows = aliases.map(norm).filter(Boolean)
   return ds.fields.find(
     (f) =>
+      (!types || types.includes(f.type)) &&
       !excludeIds.includes(f.id) &&
       lows.some((a) => {
         const n = norm(f.name)
@@ -72,6 +74,7 @@ export function expenseTemplate() {
     .filter(Boolean)
   const head = { id: uid(), type: 'meta', label: '基本信息', bordered: true, rows: headRows }
   if (head.rows.length) t.blocks.push(head)
+  if (head.rows.length) head.cols = 3
 
   // 报销事由 / 说明
   const reason = take(['报销事由', '事由', '用途', '说明', '摘要', '备注'])
@@ -110,6 +113,12 @@ export function expenseTemplate() {
     lines: 2,
     columns: ['报销人', '部门负责人', '财务审核', '总经理']
   })
+
+  // 附件票据：自动绑定附件类字段
+  const att = matchField(['附件', '票据', '凭证', '上传', '图片', '发票'], used, [FieldType.Attachment])
+  if (att) {
+    t.blocks.push({ id: uid(), type: 'attachments', label: '附件票据', fieldId: att.id, perRow: 2 })
+  }
 
   t.footer = '感谢您的支持，请妥善保管本单据'
   return t
@@ -219,7 +228,12 @@ export function addBlock(type) {
     meta: { label: '单据信息', rows: [] },
     table: { label: '明细', columns: [] },
     text: { label: '文本', text: '' },
-    sign: { label: '签名区', lines: 2 }
+    sign: { label: '签名区', lines: 2 },
+    attachments: {
+      label: '附件',
+      fieldId: ds.fields.find((f) => f.type === FieldType.Attachment)?.id || '',
+      perRow: 2
+    }
   }
   t.blocks.push({ id: uid(), type, ...presets[type] })
 }

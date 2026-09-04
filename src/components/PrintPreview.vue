@@ -1,14 +1,35 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { ds } from '../bitable.js'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ds, prepareAttachmentsFor } from '../bitable.js'
 import { currentTemplate } from '../store.js'
-import { renderAll } from '../render.js'
+import { collectAttachmentBlocks, renderAll } from '../render.js'
 import { download, escCsv, PRINT_CSS } from '../utils.js'
 
 const selected = computed(() =>
   ds.records.filter((r) => ds.selectedRecordIds.includes(r.recordId))
 )
-const html = computed(() => renderAll(currentTemplate.value, selected.value))
+const html = ref('')
+
+async function refresh() {
+  const t = currentTemplate.value
+  const recs = selected.value
+  if (!t) {
+    html.value = ''
+    return
+  }
+  html.value = renderAll(t, recs)
+  const blocks = collectAttachmentBlocks(t)
+  if (!blocks.length) return
+  for (const b of blocks) {
+    await prepareAttachmentsFor(b.fieldId, recs.slice(0, 50).map((r) => r.recordId))
+  }
+  if (currentTemplate.value === t) {
+    html.value = renderAll(currentTemplate.value, selected.value)
+  }
+}
+
+watch(() => currentTemplate.value, refresh, { deep: true, immediate: true })
+watch(() => [ds.records, ds.selectedRecordIds], refresh, { deep: true })
 
 const pageScale = ref(0.55)
 function updateScale() {
@@ -38,7 +59,35 @@ function openPrintWindow() {
   )
   w.document.close()
   w.focus()
-  setTimeout(() => w.print(), 400)
+  waitImagesThenPrint(w)
+}
+
+function waitImagesThenPrint(w) {
+  const tryPrint = () => {
+    try {
+      w.print()
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  const imgs = Array.from(w.document.images || [])
+  if (!imgs.length) {
+    setTimeout(tryPrint, 200)
+    return
+  }
+  let done = 0
+  const onDone = () => {
+    done++
+    if (done >= imgs.length) tryPrint()
+  }
+  imgs.forEach((img) => {
+    if (img.complete) onDone()
+    else {
+      img.onload = onDone
+      img.onerror = onDone
+    }
+  })
+  setTimeout(tryPrint, 8000) // 兜底：最多等 8 秒
 }
 
 function exportCsv() {

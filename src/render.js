@@ -1,4 +1,4 @@
-import { ds } from './bitable.js'
+import { attachCache, ds } from './bitable.js'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -12,6 +12,11 @@ function esc(s) {
 
 export function fieldName(fid) {
   return ds.fields.find((f) => f.id === fid)?.name || fid
+}
+
+export function collectAttachmentBlocks(template) {
+  if (!template) return []
+  return (template.blocks || []).filter((b) => b.type === 'attachments' && b.fieldId)
 }
 
 function valueFor(record, fid) {
@@ -42,15 +47,20 @@ function renderRecord(template, record, page, pages, allRecords) {
         .filter((r) => r.label)
       if (!items.length) continue
       if (block.bordered) {
+        const cols = Math.min(Math.max(Number(block.cols) || 2, 1), 4)
+        const valAlign = block.valueAlign === 'center' ? ' style="text-align:center"' : ''
         let rows = ''
-        for (let i = 0; i < items.length; i += 2) {
-          const a = items[i]
-          const b = items[i + 1]
-          rows += b
-            ? `<tr><td class="form-label">${esc(a.label)}</td><td>${esc(a.value)}</td><td class="form-label">${esc(b.label)}</td><td>${esc(b.value)}</td></tr>`
-            : `<tr><td class="form-label">${esc(a.label)}</td><td colspan="3">${esc(a.value)}</td></tr>`
+        for (let i = 0; i < items.length; i += cols) {
+          let cells = ''
+          for (let j = 0; j < cols; j++) {
+            const it = items[i + j]
+            cells += it
+              ? `<td class="form-label">${esc(it.label)}</td><td class="form-value"${valAlign}>${esc(it.value)}</td>`
+              : '<td class="form-label"></td><td class="form-value"></td>'
+          }
+          rows += `<tr>${cells}</tr>`
         }
-        body += `<div class="block form-block">${esc(block.label) ? `<div class="form-section-title">${esc(block.label)}</div>` : ''}<table class="form-table"><tbody>${rows}</tbody></table></div>`
+        body += `<div class="block form-block">${esc(block.label) ? `<div class="form-section-title">${esc(block.label)}</div>` : ''}<table class="form-table form-cols-${cols}"><tbody>${rows}</tbody></table></div>`
       } else {
         const rows = items
           .map(
@@ -83,6 +93,24 @@ function renderRecord(template, record, page, pages, allRecords) {
         body += `<div class="block form-block"><table class="form-table"><tbody><tr><td class="form-label form-label-text">${esc(block.label)}</td><td class="form-content-cell">${content}</td></tr></tbody></table></div>`
       } else {
         body += `<div class="block text-block">${content}</div>`
+      }
+    } else if (block.type === 'attachments') {
+      const perRow = Math.min(Math.max(Number(block.perRow) || 2, 1), 4)
+      const cached = record ? attachCache.get(`${record.recordId}|${block.fieldId}`) : null
+      const urls = cached?.urls || []
+      const nonImages = cached?.nonImages || 0
+      let content = ''
+      if (urls.length) {
+        const figs = urls
+          .map((u) => `<figure class="attach-item"><img src="${esc(u)}" alt="附件" /></figure>`)
+          .join('')
+        content = `<div class="attach-grid" style="grid-template-columns:repeat(${perRow},1fr)">${figs}</div>`
+      } else if (record && record.fields?.[block.fieldId]) {
+        const hint = String(record.fields[block.fieldId]).slice(0, 60)
+        content = `<div class="attach-empty">${nonImages ? '含非图片附件' : '未取到图片附件'}：${esc(hint)}</div>`
+      }
+      if (content) {
+        body += `<div class="block form-block attach-block">${esc(block.label) ? `<div class="form-section-title">${esc(block.label)}</div>` : ''}${content}</div>`
       }
     } else if (block.type === 'sign') {
       const lineCount = Math.max(1, Number(block.lines) || 2)
