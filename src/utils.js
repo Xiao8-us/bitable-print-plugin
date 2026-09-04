@@ -35,7 +35,7 @@ export const PRINT_CSS = `
     position: relative;
   }
   .page:last-child { page-break-after: auto; }
-  .page-a5 { width: 148mm; min-height: 210mm; padding: 8mm 10mm; font-size: 9.5pt; line-height: 1.45; }
+  .page-a5 { width: 210mm; min-height: 148mm; padding: 7mm 10mm 9mm; font-size: 9.5pt; line-height: 1.45; }
   .page-a5 .page-title { font-size: 17pt; }
   .exp-title-line { border-bottom: 3px double #1f2329; padding-bottom: 2.5mm; }
   .exp-title-line .page-title { margin: 0; text-align: center; letter-spacing: 8px; }

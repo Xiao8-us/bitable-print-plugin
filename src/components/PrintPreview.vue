@@ -10,7 +10,7 @@ const selected = computed(() =>
 )
 const html = ref('')
 const previewDim = computed(() =>
-  currentTemplate.value?.paper === 'a5' ? { w: 559, h: 793 } : { w: 794, h: 1123 }
+  currentTemplate.value?.paper === 'a5' ? { w: 794, h: 559 } : { w: 794, h: 1123 }
 )
 
 async function refresh() {
@@ -61,7 +61,7 @@ function ensurePageCss() {
   }
   el.textContent =
     currentTemplate.value?.paper === 'a5'
-      ? '@page { size: 148mm 210mm; margin: 0; }'
+      ? '@page { size: 210mm 148mm; margin: 0; }'
       : '@page { size: A4; margin: 0; }'
 }
 
@@ -75,7 +75,7 @@ function openPrintWindow() {
   const title = currentTemplate.value?.name || '排版打印'
   const pageCss =
     currentTemplate.value?.paper === 'a5'
-      ? '<style>@page { size: 148mm 210mm; margin: 0; }</style>'
+      ? '<style>@page { size: 210mm 148mm; margin: 0; }</style>'
       : ''
   w.document.write(
     `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${title}</title><style>${PRINT_CSS}</style>${pageCss}</head><body>${html.value}</body></html>`

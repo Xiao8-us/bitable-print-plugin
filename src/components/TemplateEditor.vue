@@ -30,7 +30,7 @@ const previewRecords = computed(() => {
 })
 
 const previewDim = computed(() =>
-  currentTemplate.value?.paper === 'a5' ? { w: 559, h: 793 } : { w: 794, h: 1123 }
+  currentTemplate.value?.paper === 'a5' ? { w: 794, h: 559 } : { w: 794, h: 1123 }
 )
 const previewHtml = ref('')
 
@@ -249,7 +249,7 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
         <input v-model="currentTemplate.expense.autoRows" type="checkbox" />
         用途长内容自动分行（按换行/加号拆行，并尽量拆出每行金额）
       </label>
-      <div class="hint">盖章/签字马赛克区域按样图留空；不匹配的字段在这里改一下即可</div>
+      <div class="hint">A5 横版（210×148mm）；盖章/签字马赛克区域按样图留空；不匹配的字段在这里改一下即可</div>
     </div>
 
     <div v-if="currentTemplate.kind !== 'expense'" class="field-bar">
@@ -295,7 +295,7 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
           <span>纸张</span>
           <select v-model="currentTemplate.paper" class="input">
             <option value="a4">A4</option>
-            <option value="a5">A5</option>
+            <option value="a5">A5 横版</option>
           </select>
         </label>
         <label class="field">

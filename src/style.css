@@ -705,9 +705,9 @@ textarea.input {
 }
 
 .page-a5 {
-  width: 148mm;
-  min-height: 210mm;
-  padding: 8mm 10mm;
+  width: 210mm;
+  min-height: 148mm;
+  padding: 7mm 10mm 9mm;
   font-size: 9.5pt;
   line-height: 1.45;
 }
