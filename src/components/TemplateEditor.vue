@@ -233,6 +233,10 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
           </select>
         </label>
       </div>
+      <label class="check-line expense-map-toggle">
+        <input v-model="currentTemplate.expense.autoRows" type="checkbox" />
+        用途长内容自动分行（按换行/加号拆行，并尽量拆出每行金额）
+      </label>
       <div class="hint">盖章/签字马赛克区域按样图留空；不匹配的字段在这里改一下即可</div>
     </div>
 

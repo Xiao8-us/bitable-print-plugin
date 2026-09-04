@@ -99,7 +99,7 @@ const ehtml = renderAll(et, [
       c2: '2026-05-26 10:00',
       c3: '202605260003',
       c4: '5/25 日本直邮报白 300 元',
-      c5: '500.00'
+      c5: '300.00'
     }
   }
 ])
@@ -107,9 +107,27 @@ checks.push(['报销单固定版式(A5)', ehtml.includes('page-a5') && ehtml.inc
 checks.push(['元信息映射', ehtml.includes('报销单位：岛链传媒') && ehtml.includes('编号：202605260003')])
 checks.push(['日期格式 yyyy/mm/dd', ehtml.includes('2026/05/26')])
 checks.push(['竖排表头', ehtml.includes('vtext')])
-checks.push(['金额大写行', ehtml.includes('伍佰元整')])
+checks.push(['领导审批栏', ehtml.includes('领导审批')])
+checks.push(['金额大写行', ehtml.includes('叁佰元整')])
 checks.push(['合计行', ehtml.includes('合　计')])
 checks.push(['三栏签字', ehtml.includes('领款人') && ehtml.includes('出纳') && ehtml.includes('复核')])
+
+const et2 = expenseTemplate()
+const ehtml2 = renderAll(et2, [
+  {
+    recordId: 'e2',
+    fields: {
+      c1: '岛链传媒',
+      c2: '2026-05-26',
+      c3: '',
+      c4: '5/25 日本直邮报白300元+5/25 购买算力充值200元',
+      c5: ''
+    }
+  }
+])
+checks.push(['长明细自动分行2行', (ehtml2.match(/exp-data/g) || []).length === 2])
+checks.push(['每行金额拆出', ehtml2.includes('300.00') && ehtml2.includes('200.00')])
+checks.push(['自动合计并转大写', ehtml2.includes('伍佰元整') && ehtml2.includes('500.00')])
 
 let failed = false
 for (const [name, ok] of checks) {

@@ -28,6 +28,34 @@ function fmtDate(v) {
   return s.replace(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2}).*/, '$1/$2/$3')
 }
 
+function splitDetails(raw) {
+  const out = []
+  const lines = String(raw || '').replace(/\r/g, '').split(/\n+/)
+  for (const ln of lines) {
+    const segs = ln.split(/(?<=[+＋;；])\s*(?=[0-9])/)
+    for (const s of segs) {
+      const t = s.trim()
+      if (t) out.push(t)
+    }
+  }
+  return out
+}
+
+function extractAmount(text) {
+  const s = String(text || '').replace(/,/g, '')
+  const m = s.match(/([0-9]+(?:\.[0-9]{1,2})?)\s*元\s*$/)
+  if (m) return parseFloat(m[1])
+  const nums = s.match(/([0-9]+(?:\.[0-9]{1,2})?)/g)
+  if (nums && nums.length) {
+    return Math.max(...nums.map(Number))
+  }
+  return null
+}
+
+function fmtAmount(n) {
+  return Number(n).toFixed(2)
+}
+
 const CN_DIGIT = '零壹贰叁肆伍陆柒捌玖'
 const CN_UNIT = ['', '拾', '佰', '仟']
 const CN_BIG = ['', '万', '亿', '兆']
@@ -226,17 +254,39 @@ export function renderAll(template, records) {
 function renderExpense(template, record, page, pages) {
   const cfg = template.expense || {}
   const val = (fid) => valueFor(record, fid)
-  const item = val(cfg.item)
-  const amount = val(cfg.amount)
-  const upper = val(cfg.uppercase) || amountUpperCn(amount)
+  const itemRaw = String(val(cfg.item) || '')
+  const declaredAmount = val(cfg.amount)
+
+  // 长明细自动分行：按换行拆，每行尽量拆出金额
+  const detailLines = []
+  if (itemRaw) {
+    const parts = splitDetails(itemRaw)
+    if (parts.length) {
+      for (const p of parts) detailLines.push({ text: p, amount: extractAmount(p) })
+    } else {
+      detailLines.push({ text: itemRaw, amount: extractAmount(itemRaw) })
+    }
+  }
+  const autoRows = cfg.autoRows !== false && detailLines.length > 1
+  const linesToShow = autoRows ? detailLines : [{ text: itemRaw, amount: declaredAmount }]
+  const parsedSum = autoRows
+    ? detailLines.reduce((sum, l) => sum + (l.amount || 0), 0)
+    : 0
+  const total = autoRows && parsedSum > 0 && !declaredAmount ? fmtAmount(parsedSum) : declaredAmount
+  const upper = val(cfg.uppercase) || amountUpperCn(total)
+  const extraBlanks = autoRows ? Math.max(0, linesToShow.length - 1) : 0
   const emptyRows = Math.min(Math.max(Number(cfg.emptyRows) || 3, 0), 6)
+  const blanksAfter = autoRows ? Math.max(0, emptyRows - extraBlanks) : emptyRows
 
   let dataRows = ''
-  dataRows += `<tr class="exp-data"><td class="exp-item">${esc(item)}</td><td class="exp-amt">${esc(amount)}</td><td></td><td></td></tr>`
-  for (let i = 0; i < emptyRows; i++) {
+  for (const line of linesToShow) {
+    const amt = autoRows && line.amount != null ? fmtAmount(line.amount) : declaredAmount
+    dataRows += `<tr class="exp-data"><td class="exp-item">${esc(line.text)}</td><td class="exp-amt">${esc(amt || '')}</td><td></td><td></td></tr>`
+  }
+  for (let i = 0; i < blanksAfter; i++) {
     dataRows += '<tr class="exp-blank"><td></td><td></td><td></td><td></td></tr>'
   }
-  dataRows += `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(amount)}</td><td></td><td></td></tr>`
+  dataRows += `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td></td><td></td></tr>`
   dataRows += `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="3">${esc(upper)}</td></tr>`
 
   // 附件图片（若有映射字段）
@@ -271,7 +321,7 @@ function renderExpense(template, record, page, pages) {
         <th class="exp-th-item">用途</th>
         <th class="exp-th-amt">金额(元)</th>
         <th class="exp-th-opinion"><span class="vtext">部门主管意见</span></th>
-        <th class="exp-th-leader"></th>
+        <th class="exp-th-leader"><span class="vtext">领导审批</span></th>
       </tr>
     </thead>
     <tbody>${dataRows}</tbody>
