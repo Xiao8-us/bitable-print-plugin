@@ -472,7 +472,7 @@ function expenseAttachHtml(template, record) {
   const cfg = template.expense || {}
   if (!cfg.attachment || !record) return null
   const cached = attachCache.get(`${record.recordId}|${cfg.attachment}`)
-  const content = attachmentsHtml(record, cfg.attachment, cached, 2, true)
+  const content = attachmentsHtml(record, cfg.attachment, cached, 3, true)
   if (!content) return null
   const val = (fid) => valueFor(record, fid)
   const serial = extractSerial(record.fields?.[cfg.serialField])

@@ -1189,6 +1189,13 @@ textarea.input {
   text-align: center;
 }
 
+/* 附件大图最终覆盖（放在文件末尾保证优先级） */
+.attach-page .attach-item img {
+  width: 100%;
+  height: 72mm;
+  object-fit: contain;
+}
+
 /* ===== 打印 ===== */
 @media print {
   @page {
