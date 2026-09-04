@@ -134,15 +134,20 @@ async function findInstanceBySerial(token, serial, date) {
     .filter(Boolean)
   const HOUR = 3600 * 1000
   const DAY = 24 * HOUR
-  const base = date
-    ? Date.parse(`${date}T00:00:00+08:00`)
-    : Math.floor(Date.now() / HOUR) * HOUR
-  const days = Number.isFinite(base) ? [0, -1, -2, 1] : [0]
-  if (!Number.isFinite(base)) days[0] = Date.now()
+  // date 形如 20260903（无连字符），手工拼成 ISO 再解析
+  const ymd = String(date || '').replace(/\D/g, '').slice(0, 8)
+  const parsed =
+    ymd.length === 8
+      ? Date.parse(
+          `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}T00:00:00+08:00`
+        )
+      : NaN
+  const base = Number.isFinite(parsed) ? parsed : Date.now()
+  const days = [0, -1, -2, 1]
   const stats = { defs: defs.length, windows: 0, lists: 0, details: 0, codes: 0, serials: [] }
   for (const def of defs) {
     for (const off of days) {
-      const from = Number.isFinite(base) ? base + off * DAY : base
+      const from = base + off * DAY
       const to = from + DAY
       for (let ws = from; ws < to; ws += 10 * HOUR) {
         const we = Math.min(ws + 10 * HOUR, to)
