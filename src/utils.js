@@ -68,6 +68,9 @@ export const PRINT_CSS = `
   .attach-page-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #1f2329; padding-bottom: 2mm; margin-bottom: 4mm; }
   .attach-page-title { font-weight: 700; font-size: 13pt; }
   .attach-page-no-label { font-size: 9.5pt; }
+  .attach-page .attach-grid { gap: 6mm; }
+  .attach-page .attach-item { border: none; padding: 0; background: #fff; break-inside: avoid; }
+  .attach-page .attach-item img { width: 100%; height: 100mm; object-fit: contain; }
   .exp-page-no { position: absolute; right: 8mm; bottom: 6mm; font-size: 8pt; color: #646a73; }
   .page-header { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #1f2329; padding-bottom: 10px; margin-bottom: 14px; }
   .logo { height: 44px; max-width: 120px; object-fit: contain; }

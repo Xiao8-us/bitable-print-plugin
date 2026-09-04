@@ -891,6 +891,23 @@ textarea.input {
   font-size: 9.5pt;
 }
 
+.attach-page .attach-grid {
+  gap: 6mm;
+}
+
+.attach-page .attach-item {
+  border: none;
+  padding: 0;
+  background: #fff;
+  break-inside: avoid;
+}
+
+.attach-page .attach-item img {
+  width: 100%;
+  height: 100mm;
+  object-fit: contain;
+}
+
 .exp-page-no {
   position: absolute;
   right: 8mm;
