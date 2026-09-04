@@ -250,6 +250,18 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
             <option :value="5">5</option>
           </select>
         </label>
+        <label class="field">
+          <span>部门主管意见占行数</span>
+          <select class="input" :value="Number(currentTemplate.expense.depRows) || 0" @change="currentTemplate.expense.depRows = Number($event.target.value)">
+            <option :value="0">自动（与领导框均分）</option>
+            <option :value="1">1 行</option>
+            <option :value="2">2 行</option>
+            <option :value="3">3 行</option>
+            <option :value="4">4 行</option>
+            <option :value="5">5 行</option>
+            <option :value="6">6 行</option>
+          </select>
+        </label>
       </div>
       <label class="check-line expense-map-toggle">
         <input v-model="currentTemplate.expense.autoRows" type="checkbox" />

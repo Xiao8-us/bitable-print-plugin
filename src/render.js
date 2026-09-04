@@ -440,10 +440,14 @@ function expenseFormHtml(template, record) {
   const emptyRows = Math.min(Math.max(Number(cfg.emptyRows) || 3, 0), 6)
   const blanksAfter = autoRows ? Math.max(0, emptyRows - extraBlanks) : emptyRows
 
-  // 右侧审批区单个列：部门主管意见占上半（含首条明细），
-  // 领导审批紧接其下直到合计行；两块无间隙、随明细行数自适应均分
+  // 右侧审批区单个列：部门主管意见占前 depRows 行，
+  // 领导审批紧接其下直到合计行；两块无间隙
   const bodyCount = linesToShow.length + blanksAfter
-  const depRows = Math.max(1, Math.ceil(bodyCount / 2))
+  const manualDep = Number(cfg.depRows)
+  const depRows =
+    manualDep >= 1
+      ? Math.min(Math.floor(manualDep), bodyCount)
+      : Math.max(1, Math.ceil(bodyCount / 2))
   const leadRows = bodyCount - depRows + 1
   const dataRows = buildExpenseRows(linesToShow, declaredAmount, blanksAfter, depRows)
   const totalRow =

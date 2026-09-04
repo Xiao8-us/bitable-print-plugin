@@ -86,6 +86,7 @@ export function expenseTemplate() {
       uppercase: uppercase?.id || '',
       attachment: att?.id || '',
       emptyRows: 3,
+      depRows: 0,
       autoRows: true
     }
   }
