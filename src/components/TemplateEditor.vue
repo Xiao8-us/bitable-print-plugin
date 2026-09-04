@@ -17,7 +17,7 @@ import {
   removeTemplate,
   store
 } from '../store.js'
-import { collectAttachmentBlocks, renderAll } from '../render.js'
+import { collectAttachmentBlocks, enrichApprovalAttachments, renderAll } from '../render.js'
 
 const showSettings = ref(false)
 const focusedBlockId = ref('')
@@ -43,6 +43,7 @@ async function refreshPreview() {
   }
   previewHtml.value = renderAll(t, recs)
   updateScale()
+  await enrichApprovalAttachments(t, recs)
   const blocks = collectAttachmentBlocks(t)
   if (!blocks.length) return
   for (const b of blocks) {
@@ -220,6 +221,17 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
             <option value="">不打印附件</option>
             <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}（{{ f.typeName }}）</option>
           </select>
+        </label>
+        <label class="field">
+          <span>审批单号字段（用于取审批票据）</span>
+          <select class="input" :value="currentTemplate.expense.serialField" @change="currentTemplate.expense.serialField = $event.target.value">
+            <option value="">（无）</option>
+            <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </label>
+        <label class="field field-wide">
+          <span>票据接口地址（部署小后端后填写）</span>
+          <input v-model="currentTemplate.expense.approvalUrl" class="input" placeholder="https://你的后端域名/api/approval-attachments（留空=不自动拉取）" />
         </label>
         <label class="field">
           <span>明细空行数（供手写加行）</span>

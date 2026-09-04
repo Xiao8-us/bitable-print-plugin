@@ -174,6 +174,41 @@ export function amountUpperCn(text) {
   return out
 }
 
+export function extractSerial(text) {
+  const s = String(text || '')
+  const md = s.match(/\[([^\]]+)\]/)
+  if (md && /\d/.test(md[1])) return md[1].trim()
+  const num = s.match(/\d{8,}/)
+  return num ? num[0] : ''
+}
+
+export async function enrichApprovalAttachments(template, records) {
+  if (!template || template.kind !== 'expense' || !records?.length) return
+  const cfg = template.expense
+  if (!cfg?.approvalUrl || !cfg?.serialField || !cfg?.attachment) return
+  const base = String(cfg.approvalUrl).replace(/\/+$/, '')
+  for (const r of records.slice(0, 30)) {
+    const key = `${r.recordId}|${cfg.attachment}`
+    if (attachCache.has(key)) continue
+    const serial = extractSerial(r.fields?.[cfg.serialField])
+    if (!serial) continue
+    try {
+      const dateRaw = String(r.fields?.[cfg.date] || '').replace(/\D/g, '').slice(0, 8)
+      const res = await fetch(
+        `${base}?serial=${encodeURIComponent(serial)}&date=${encodeURIComponent(dateRaw)}`
+      )
+      const j = await res.json()
+      if (j?.ok && Array.isArray(j.urls) && j.urls.length) {
+        attachCache.set(key, { urls: j.urls, nonImages: 0 })
+      } else {
+        attachCache.set(key, { urls: [], nonImages: 1 })
+      }
+    } catch (e) {
+      attachCache.set(key, { urls: [], nonImages: 0 })
+    }
+  }
+}
+
 function valueFor(record, fid) {
   if (!record) return ''
   const v = record.fields?.[fid]

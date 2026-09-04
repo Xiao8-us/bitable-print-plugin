@@ -57,6 +57,7 @@ export function expenseTemplate() {
   const company = pick(['报销单位', '单位名称', '单位', '公司'])
   const date = pick(['报销日期', '报销时间', '日期'])
   const code = pick(['单据编号', '编号', '单号', '流水号'])
+  const serialF = matchField(['申请编号', '审批编号', '单据编号', '编号'], used)
   const item = pick(['报销事由', '用途', '事由', '费用说明', '说明', '摘要'])
   const amount = pick(['报销金额', '金额', '合计金额', '总额'])
   const att =
@@ -78,6 +79,8 @@ export function expenseTemplate() {
       company: company?.id || '',
       date: date?.id || '',
       code: code?.id || '',
+      serialField: serialF?.id || code?.id || '',
+      approvalUrl: '',
       item: item?.id || '',
       amount: amount?.id || '',
       uppercase: uppercase?.id || '',

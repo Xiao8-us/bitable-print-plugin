@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ds, prepareAttachmentsFor } from '../bitable.js'
 import { currentTemplate } from '../store.js'
-import { collectAttachmentBlocks, renderAll } from '../render.js'
+import { collectAttachmentBlocks, enrichApprovalAttachments, renderAll } from '../render.js'
 import { download, escCsv, PRINT_CSS } from '../utils.js'
 
 const selected = computed(() =>
@@ -22,6 +22,7 @@ async function refresh() {
   }
   html.value = renderAll(t, recs)
   updateScale()
+  await enrichApprovalAttachments(t, recs)
   const blocks = collectAttachmentBlocks(t)
   if (!blocks.length) return
   for (const b of blocks) {
