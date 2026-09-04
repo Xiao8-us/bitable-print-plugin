@@ -142,8 +142,8 @@ const ehtml3 = renderAll(et3, [
     }
   }
 ])
-checks.push(['结构化明细清洗', ehtml3.includes('购买电梯风扇（8/29）') && !ehtml3.includes('报销内容:') && !ehtml3.includes('CNY')])
-checks.push(['清洗后金额与合计', ehtml3.includes('74.00') && ehtml3.includes('柒拾肆元整')])
+checks.push(['明细保留原文', ehtml3.includes('报销内容:购买电梯风扇') && ehtml3.includes('CNY')])
+checks.push(['金额拆出与大写', ehtml3.includes('74.00') && ehtml3.includes('柒拾肆元整')])
 
 // 附件独立成第二页
 const et4 = expenseTemplate()

@@ -120,14 +120,16 @@ function attachmentsHtml(record, fieldId, cached, perRow, webOnly = false) {
     }))
   }
   if (!items.length) {
-    return raw
-      ? `<div class="attach-empty">附件无法预览：${esc(String(raw).slice(0, 80))}</div>`
-      : ''
+    if (!raw) return ''
+    const msg = cached?.msg || '附件无法预览'
+    return `<div class="attach-empty">${esc(msg)}</div>`
   }
   const links = items.filter((i) => i.kind === 'link')
   const imgs = items.filter((i) => i.kind === 'img')
   if (webOnly && !imgs.length && links.length) {
-    return '<div class="attach-empty">含审批附件：请在模板映射里填写「票据接口地址」，打印时将自动取回票据图片</div>'
+    const msg =
+      cached?.msg || '含审批附件：请在模板映射里填写「票据接口地址」，打印时将自动取回票据图片'
+    return `<div class="attach-empty">${esc(msg)}</div>`
   }
   const grid = imgs.length
     ? `<div class="attach-grid" style="grid-template-columns:repeat(${perRow},1fr)">${imgs
@@ -221,13 +223,25 @@ export async function enrichApprovalAttachments(template, records) {
         `${base}?serial=${encodeURIComponent(serial)}&date=${encodeURIComponent(dateRaw)}`
       )
       const j = await res.json()
-      if (j?.ok && Array.isArray(j.urls) && j.urls.length) {
-        attachCache.set(key, { urls: j.urls, nonImages: 0 })
+      if (j?.ok) {
+        if (Array.isArray(j.urls) && j.urls.length) {
+          attachCache.set(key, { urls: j.urls, nonImages: 0 })
+        } else {
+          attachCache.set(key, { urls: [], nonImages: 1, msg: '该审批单没有取到图片附件' })
+        }
       } else {
-        attachCache.set(key, { urls: [], nonImages: 1 })
+        attachCache.set(key, {
+          urls: [],
+          nonImages: 1,
+          msg: '后端未找到该审批单：' + (j?.error || ('HTTP ' + res.status))
+        })
       }
     } catch (e) {
-      attachCache.set(key, { urls: [], nonImages: 0 })
+      attachCache.set(key, {
+        urls: [],
+        nonImages: 0,
+        msg: '票据接口请求失败：' + (e?.message || '网络错误')
+      })
     }
   }
 }
@@ -383,9 +397,13 @@ function expenseFormHtml(template, record) {
   if (itemRaw) {
     const parts = splitDetails(itemRaw)
     if (parts.length) {
-      for (const p of parts) detailLines.push(parseDetailLine(p))
+      for (const p of parts) {
+        const parsed = parseDetailLine(p)
+        detailLines.push({ text: p, amount: parsed.amount })
+      }
     } else {
-      detailLines.push(parseDetailLine(itemRaw))
+      const parsed = parseDetailLine(itemRaw)
+      detailLines.push({ text: itemRaw, amount: parsed.amount })
     }
   }
   const autoRows = cfg.autoRows !== false && detailLines.length > 1
