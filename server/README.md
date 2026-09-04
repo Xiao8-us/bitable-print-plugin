@@ -1,12 +1,12 @@
 # 审批票据直链小后端（Vercel）
 
-用途：排版打印插件在浏览器里无法直接放应用密钥调审批接口。这个小后端负责
+用途：排版打印插件在浏览器里无法直接放应用密钥调审批接口。这个小后端（仓库根目录 `api/approval-attachments.js`）负责
 “按申请编号找到审批实例 → 取回票据附件直链”，插件再把这些直链图片印到报销单上。
 
 ## 部署步骤
 
 1. 注册/登录 https://vercel.com （可用 GitHub 账号一键导入）
-2. 导入本仓库 `Xiao8-us/bitable-print-plugin`，Vercel 会自动识别 `server/api` 为云函数
+2. 导入本仓库 `Xiao8-us/bitable-print-plugin`，Vercel 会自动识别根目录 `api/` 为云函数
 3. 在 Vercel 项目 Settings → Environment Variables 添加：
    - `FEISHU_APP_ID`：审批表所在租户的自建应用 App ID
    - `FEISHU_APP_SECRET`：对应 App Secret
