@@ -10,6 +10,7 @@
 
 const DEFS_DEFAULT =
   'FF12E11B-CB61-487B-A551-A47C6C838F32,3CEE9405-4F03-43E9-BE3C-C7D149E5F089'
+const VER = '20260904b'
 
 function json(res, status, body) {
   res.statusCode = status
@@ -136,25 +137,29 @@ async function findInstanceBySerial(token, serial, date) {
   const base = date
     ? Date.parse(`${date}T00:00:00+08:00`)
     : Math.floor(Date.now() / HOUR) * HOUR
-  const days = Number.isFinite(base)
-    ? [0, -1] // 先查报销当天，找不到再查前一天
-    : [0]
+  const days = Number.isFinite(base) ? [0, -1, -2, 1] : [0]
   if (!Number.isFinite(base)) days[0] = Date.now()
+  const stats = { defs: defs.length, windows: 0, lists: 0, details: 0, codes: 0, serials: [] }
   for (const def of defs) {
     for (const off of days) {
       const from = Number.isFinite(base) ? base + off * DAY : base
       const to = from + DAY
       for (let ws = from; ws < to; ws += 10 * HOUR) {
         const we = Math.min(ws + 10 * HOUR, to)
+        stats.windows++
         let pageToken = ''
         for (let page = 0; page < 10; page++) {
           const d = await larkListCodes(token, def, ws, we, pageToken)
+          stats.lists++
           const codes =
             d.instance_code_list || d.instance_codes || (Array.isArray(d) ? d : [])
           for (const code of codes) {
+            stats.codes++
             const detail = await larkInstanceDetail(token, code)
+            stats.details++
+            if (stats.serials.length < 60) stats.serials.push(detail.serial_number || '')
             if (String(detail.serial_number || '') === serial) {
-              return detail
+              return { detail, stats }
             }
           }
           if (!d.has_more) break
@@ -164,7 +169,7 @@ async function findInstanceBySerial(token, serial, date) {
       }
     }
   }
-  return null
+  return { detail: null, stats }
 }
 
 export default async function handler(req, res) {
@@ -185,10 +190,21 @@ export default async function handler(req, res) {
     const rk = serial + '|' + (date || '')
     const hit = cacheGet(resultCache, rk)
     if (hit) return json(res, 200, hit)
-    const inst = await findInstanceBySerial(token, serial, date)
-    if (!inst) return json(res, 404, { ok: false, error: 'instance not found' })
+    const found = await findInstanceBySerial(token, serial, date)
+    const inst = found.detail
+    if (!inst) {
+      if (req.query.debug === '1') {
+        return json(res, 404, {
+          ok: false,
+          error: 'instance not found',
+          ver: VER,
+          debug: found.stats
+        })
+      }
+      return json(res, 404, { ok: false, error: 'instance not found', ver: VER })
+    }
     const urls = extractAttachmentUrls(inst.form)
-    const body = { ok: true, urls }
+    const body = { ok: true, urls, ver: VER }
     cacheSet(resultCache, rk, body)
     return json(res, 200, body)
   } catch (e) {
