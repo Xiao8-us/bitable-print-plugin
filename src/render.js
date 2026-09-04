@@ -401,9 +401,7 @@ function buildExpenseRows(lines, declaredAmount, blanksAfter, depRows, total) {
   let rows = ''
   bodyTexts.forEach((b, i) => {
     let col = ''
-    if (i === 0) col = '<td class="exp-label-cell">部门主管意见</td>'
-    else if (i === 1 && blankA > 0)
-      col = `<td class="exp-blank-box" rowspan="${blankA}"></td>`
+    if (i === 0 && U > 0) col = `<td class="exp-blank-box" rowspan="${U}"></td>`
     else if (i === U && U > 0 && U < bodyCount)
       col = '<td class="exp-label-cell">领导审批</td>'
     else if (i === U + 1 && blankB > 0)
@@ -489,7 +487,7 @@ function expenseFormHtml(template, record) {
       <tr>
         <th class="exp-th-item">用途</th>
         <th class="exp-th-amt">金额(元)</th>
-        <th class="exp-th-approve"></th>
+        <th class="exp-th-approve">部门主管意见</th>
       </tr>
     </thead>
     <tbody>
