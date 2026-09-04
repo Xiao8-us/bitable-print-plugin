@@ -340,13 +340,13 @@ function renderExpense(template, record, page, pages) {
   let dataRows = ''
   for (const line of linesToShow) {
     const amt = autoRows && line.amount != null ? fmtAmount(line.amount) : declaredAmount
-    dataRows += `<tr class="exp-data"><td class="exp-item">${esc(line.text)}</td><td class="exp-amt">${esc(amt || '')}</td><td></td><td></td></tr>`
+  dataRows += `<tr class="exp-data"><td class="exp-item">${esc(line.text)}</td><td class="exp-amt">${esc(amt || '')}</td><td class="exp-opinion-cell"></td></tr>`
   }
   for (let i = 0; i < blanksAfter; i++) {
-    dataRows += '<tr class="exp-blank"><td></td><td></td><td></td><td></td></tr>'
+    dataRows += '<tr class="exp-blank"><td></td><td></td><td class="exp-opinion-cell"></td></tr>'
   }
-  dataRows += `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td></td><td></td></tr>`
-  dataRows += `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="3">${esc(upper)}</td></tr>`
+  dataRows += `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-opinion-cell"></td></tr>`
+  dataRows += `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="2">${esc(upper)}</td></tr>`
 
   // 附件图片（若有映射字段）
   let attachHtml = ''
@@ -374,8 +374,12 @@ function renderExpense(template, record, page, pages) {
       <tr>
         <th class="exp-th-item">用途</th>
         <th class="exp-th-amt">金额(元)</th>
-        <th class="exp-th-opinion"><span class="vtext">部门主管意见</span></th>
-        <th class="exp-th-leader"><span class="vtext">领导审批</span></th>
+        <th class="exp-th-approve">
+          <div class="approve-stack">
+            <div class="approve-head">部门主管意见</div>
+            <div class="approve-head">领导审批</div>
+          </div>
+        </th>
       </tr>
     </thead>
     <tbody>${dataRows}</tbody>

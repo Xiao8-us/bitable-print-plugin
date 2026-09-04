@@ -106,7 +106,7 @@ const ehtml = renderAll(et, [
 checks.push(['报销单固定版式(A5)', ehtml.includes('page-a5') && ehtml.includes('费用报销单')])
 checks.push(['元信息映射', ehtml.includes('报销单位：岛链传媒') && ehtml.includes('编号：202605260003')])
 checks.push(['日期格式 yyyy/mm/dd', ehtml.includes('2026/05/26')])
-checks.push(['竖排表头', ehtml.includes('vtext')])
+checks.push(['审批两栏上下堆叠', ehtml.includes('approve-head') && ehtml.indexOf('部门主管意见') < ehtml.indexOf('领导审批')])
 checks.push(['领导审批栏', ehtml.includes('领导审批')])
 checks.push(['金额大写行', ehtml.includes('叁佰元整')])
 checks.push(['合计行', ehtml.includes('合　计')])

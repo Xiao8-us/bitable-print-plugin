@@ -44,10 +44,12 @@ export const PRINT_CSS = `
   .exp-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   .exp-table th, .exp-table td { border: 1px solid #1f2329; padding: 1.8mm 1.5mm; vertical-align: middle; word-break: break-all; }
   .exp-table th { font-weight: 600; font-size: 10pt; text-align: center; }
-  .exp-th-item { width: 34%; }
-  .exp-th-amt { width: 20%; }
-  .exp-th-opinion { width: 22%; }
-  .exp-th-leader { width: 24%; }
+  .exp-th-item { width: 48%; }
+  .exp-th-amt { width: 22%; }
+  .exp-th-approve { width: 30%; }
+  .approve-stack { display: flex; flex-direction: column; height: 100%; }
+  .approve-head { flex: 1; display: flex; align-items: center; justify-content: center; padding: 1mm 0; font-size: 9pt; }
+  .approve-head + .approve-head { border-top: 1px solid #1f2329; }
   .vtext { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; }
   .exp-item { font-size: 9pt; line-height: 1.55; white-space: pre-wrap; }
   .exp-amt { text-align: right; font-size: 10pt; }
