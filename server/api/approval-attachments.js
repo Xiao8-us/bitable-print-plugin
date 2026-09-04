@@ -70,31 +70,46 @@ async function findInstanceBySerial(token, serial, date) {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
+  const HOUR = 3600 * 1000
+  const DAY = 24 * HOUR
+  // 接口要求每次查询区间 ≤10 小时，且必须带 start_time/end_time。
+  // 以报销日期为锚点，往前 3 天、往后 1 天，按 10 小时窗口分片扫描。
+  const base = date
+    ? Date.parse(`${date}T00:00:00+08:00`)
+    : Math.floor(Date.now() / HOUR) * HOUR
+  const from = Number.isFinite(base) ? base - 3 * DAY : Date.now() - 7 * DAY
+  const to = Number.isFinite(base) ? base + 1 * DAY : Date.now()
   for (const def of defs) {
-    let pageToken = ''
-    for (let page = 0; page < 12; page++) {
-      const q = new URLSearchParams({ approval_code: def, page_size: '100' })
-      if (pageToken) q.set('page_token', pageToken)
-      const d = await larkGet(
-        token,
-        `https://open.feishu.cn/open-apis/approval/v4/instances?${q.toString()}`
-      )
-      const codes =
-        d.instance_code_list || d.instance_codes || (Array.isArray(d) ? d : [])
-      for (const code of codes) {
-        const detail = await larkGet(
+    for (let ws = from; ws < to; ws += 10 * HOUR) {
+      const we = Math.min(ws + 10 * HOUR, to)
+      let pageToken = ''
+      for (let page = 0; page < 10; page++) {
+        const q = new URLSearchParams({
+          approval_code: def,
+          page_size: '100',
+          start_time: String(ws),
+          end_time: String(we)
+        })
+        if (pageToken) q.set('page_token', pageToken)
+        const d = await larkGet(
           token,
-          `https://open.feishu.cn/open-apis/approval/v4/instances/${encodeURIComponent(code)}`
+          `https://open.feishu.cn/open-apis/approval/v4/instances?${q.toString()}`
         )
-        if (String(detail.serial_number || '') === serial) {
-          if (!date || serialDateMs(detail.start_time) === date || !detail.start_time) {
+        const codes =
+          d.instance_code_list || d.instance_codes || (Array.isArray(d) ? d : [])
+        for (const code of codes) {
+          const detail = await larkGet(
+            token,
+            `https://open.feishu.cn/open-apis/approval/v4/instances/${encodeURIComponent(code)}`
+          )
+          if (String(detail.serial_number || '') === serial) {
             return detail
           }
         }
+        if (!d.has_more) break
+        pageToken = d.page_token || ''
+        if (!pageToken) break
       }
-      if (!d.has_more) break
-      pageToken = d.page_token || ''
-      if (!pageToken) break
     }
   }
   return null
