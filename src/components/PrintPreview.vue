@@ -6,6 +6,7 @@ import {
   collectAttachmentBlocks,
   enrichApprovalAttachments,
   extractSerial,
+  inspectAttachmentOrientations,
   renderAll
 } from '../render.js'
 import { download, escCsv, PRINT_CSS } from '../utils.js'
@@ -38,6 +39,7 @@ async function refresh() {
       html.value = renderAll(t, recs)
       updateScale()
       await enrichApprovalAttachments(t, recs)
+      await inspectAttachmentOrientations(t, recs)
       const blocks = collectAttachmentBlocks(t)
       if (blocks.length) {
         for (const b of blocks) {

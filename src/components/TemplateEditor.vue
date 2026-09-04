@@ -17,7 +17,12 @@ import {
   removeTemplate,
   store
 } from '../store.js'
-import { collectAttachmentBlocks, enrichApprovalAttachments, renderAll } from '../render.js'
+import {
+  collectAttachmentBlocks,
+  enrichApprovalAttachments,
+  inspectAttachmentOrientations,
+  renderAll
+} from '../render.js'
 
 const showSettings = ref(false)
 const focusedBlockId = ref('')
@@ -44,6 +49,7 @@ async function refreshPreview() {
   previewHtml.value = renderAll(t, recs)
   updateScale()
   await enrichApprovalAttachments(t, recs)
+  await inspectAttachmentOrientations(t, recs)
   const blocks = collectAttachmentBlocks(t)
   if (!blocks.length) return
   for (const b of blocks) {

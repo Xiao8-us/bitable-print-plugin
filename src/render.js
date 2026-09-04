@@ -373,8 +373,7 @@ export function renderAll(template, records) {
     const flat = []
     for (const r of list) {
       flat.push(expenseFormHtml(template, r))
-      const att = expenseAttachHtml(template, r)
-      if (att) flat.push(att)
+      flat.push(...expenseAttachPages(template, r))
     }
     return flat.map((b, i) => b(i + 1, flat.length)).join('\n')
   }
@@ -384,6 +383,33 @@ export function renderAll(template, records) {
   return list
     .map((r, i) => renderRecord(template, r, i + 1, list.length, list))
     .join('\n')
+}
+
+function buildExpenseRows(lines, declaredAmount, blanksAfter, depRows, leadRows) {
+  const bodyCount = lines.length + blanksAfter
+  let rows = ''
+  for (let i = 0; i < lines.length; i++) {
+    const amt = declaredAmount || (lines[i].amount != null ? fmtAmount(lines[i].amount) : '')
+    let col3 = ''
+    if (i === 0) col3 = `<td class="exp-dep-cell vtext-cell" rowspan="${depRows}">部门主管意见</td>`
+    else if (i >= depRows) col3 = '<td class="exp-opinion-cell"></td>'
+    let col4 = ''
+    if (i < depRows) col4 = '<td class="exp-opinion-cell"></td>'
+    else if (i === depRows && depRows < bodyCount)
+      col4 = `<td class="exp-lead-cell vtext-cell" rowspan="${leadRows}">领导审批</td>`
+    rows += `<tr class="exp-data"><td class="exp-item">${esc(lines[i].text)}</td><td class="exp-amt">${esc(amt || '')}</td>${col3}${col4}</tr>`
+  }
+  for (let i = 0; i < blanksAfter; i++) {
+    const idx = lines.length + i
+    let col3 = ''
+    if (idx >= depRows) col3 = '<td class="exp-opinion-cell"></td>'
+    let col4 = ''
+    if (idx < depRows) col4 = '<td class="exp-opinion-cell"></td>'
+    else if (idx === depRows && depRows < bodyCount)
+      col4 = `<td class="exp-lead-cell vtext-cell" rowspan="${leadRows}">领导审批</td>`
+    rows += `<tr class="exp-blank"><td></td><td></td>${col3}${col4}</tr>`
+  }
+  return rows
 }
 
 function expenseFormHtml(template, record) {
@@ -418,17 +444,16 @@ function expenseFormHtml(template, record) {
   const emptyRows = Math.min(Math.max(Number(cfg.emptyRows) || 3, 0), 6)
   const blanksAfter = autoRows ? Math.max(0, emptyRows - extraBlanks) : emptyRows
 
-  let dataRows = ''
-  for (const line of linesToShow) {
-    const amt =
-      declaredAmount || (line.amount != null ? fmtAmount(line.amount) : '')
-    dataRows += `<tr class="exp-data"><td class="exp-item">${esc(line.text)}</td><td class="exp-amt">${esc(amt || '')}</td><td class="exp-opinion-cell"></td></tr>`
-  }
-  for (let i = 0; i < blanksAfter; i++) {
-    dataRows += '<tr class="exp-blank"><td></td><td></td><td class="exp-opinion-cell"></td></tr>'
-  }
-  dataRows += `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-opinion-cell"></td></tr>`
-  dataRows += `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="2">${esc(upper)}</td></tr>`
+  // 审批栏分段：部门主管意见对齐明细上半段，领导审批对齐下半段（含合计行）
+  const bodyCount = linesToShow.length + blanksAfter
+  const depRows = Math.max(1, Math.ceil(bodyCount / 2))
+  const leadRows = bodyCount - depRows + 1
+  const dataRows = buildExpenseRows(linesToShow, declaredAmount, blanksAfter, depRows, leadRows)
+  const totalRow =
+    depRows >= bodyCount
+      ? `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-opinion-cell"></td><td class="exp-lead-cell vtext-cell">领导审批</td></tr>`
+      : `<tr class="exp-total"><td class="exp-total-label">合　计</td><td class="exp-amt">${esc(total || '')}</td><td class="exp-opinion-cell"></td></tr>`
+  const capRow = `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="3">${esc(upper)}</td></tr>`
 
   return (page, pages) => {
     const footer = fillVars(template.footer || '', { page, pages })
@@ -442,20 +467,20 @@ function expenseFormHtml(template, record) {
     <span class="exp-meta-date">${esc(fmtDate(val(cfg.date)))}</span>
     <span class="exp-meta-item">编号：${esc(codeShown)}</span>
   </div>
-  <table class="exp-table">
+  <table class="exp-table exp-table-approve">
     <thead>
       <tr>
         <th class="exp-th-item">用途</th>
         <th class="exp-th-amt">金额(元)</th>
-        <th class="exp-th-approve">
-          <div class="approve-stack">
-            <div class="approve-head">部门主管意见</div>
-            <div class="approve-head">领导审批</div>
-          </div>
-        </th>
+        <th class="exp-th-approve"></th>
+        <th class="exp-th-approve"></th>
       </tr>
     </thead>
-    <tbody>${dataRows}</tbody>
+    <tbody>
+      ${dataRows}
+      ${totalRow}
+      ${capRow}
+    </tbody>
   </table>
   <div class="exp-sign">
     <div class="exp-sign-cell"><span class="exp-sign-label">复核：</span><div class="exp-sign-space"></div></div>
@@ -468,15 +493,62 @@ function expenseFormHtml(template, record) {
   }
 }
 
-function expenseAttachHtml(template, record) {
+function expenseAttachPages(template, record) {
   const cfg = template.expense || {}
-  if (!cfg.attachment || !record) return null
+  if (!cfg.attachment || !record) return []
   const cached = attachCache.get(`${record.recordId}|${cfg.attachment}`)
-  const content = attachmentsHtml(record, cfg.attachment, cached, 3, true)
-  if (!content) return null
+  if (!cached?.urls?.length) {
+    const content = attachmentsHtml(record, cfg.attachment, cached, 3, true)
+    if (!content) return []
+    return [attachPageBuilder(template, record, content)]
+  }
+  const orient = cached.orient || cached.urls.map(() => 'portrait')
+  const portraits = []
+  const landscapes = []
+  cached.urls.forEach((u, i) => {
+    ;(orient[i] === 'landscape' ? landscapes : portraits).push(u)
+  })
+  const builders = []
+  if (portraits.length) {
+    const figs = portraits
+      .map((u) => `<figure class="attach-item"><img src="${esc(u)}" alt="附件" /></figure>`)
+      .join('')
+    builders.push(
+      attachPageBuilder(
+        template,
+        record,
+        `<div class="attach-grid" style="grid-template-columns:repeat(3,1fr)">${figs}</div>`
+      )
+    )
+  }
+  for (const u of landscapes) {
+    builders.push((page, pages) => {
+      const label = attachPageLabel(template, record)
+      return `<div class="page page-a5 attach-page attach-landscape">
+  <div class="attach-page-head">
+    <span class="attach-page-title">费用报销单 · 附件票据</span>
+    <span class="attach-page-no-label">编号：${esc(label)}</span>
+  </div>
+  <figure class="landscape-item"><img src="${esc(u)}" alt="附件" /></figure>
+  <div class="exp-page-no">${page}/${pages}</div>
+</div>`
+    })
+  }
+  if (!builders.length && cached.msg) {
+    builders.push(attachPageBuilder(template, record, `<div class="attach-empty">${esc(cached.msg)}</div>`))
+  }
+  return builders
+}
+
+function attachPageLabel(template, record) {
+  const cfg = template.expense || {}
   const val = (fid) => valueFor(record, fid)
   const serial = extractSerial(record.fields?.[cfg.serialField])
-  const label = val(cfg.code) || serial
+  return val(cfg.code) || serial
+}
+
+function attachPageBuilder(template, record, content) {
+  const label = attachPageLabel(template, record)
   return (page, pages) => `
 <div class="page page-a5 attach-page">
   <div class="attach-page-head">
@@ -486,4 +558,34 @@ function expenseAttachHtml(template, record) {
   ${content}
   <div class="exp-page-no">${page}/${pages}</div>
 </div>`
+}
+
+export async function inspectAttachmentOrientations(template, records) {
+  if (!template || template.kind !== 'expense' || !records?.length) return
+  const cfg = template.expense
+  if (!cfg?.attachment) return
+  for (const r of records.slice(0, 30)) {
+    const entry = attachCache.get(`${r.recordId}|${cfg.attachment}`)
+    if (!entry?.urls?.length || entry.orient) continue
+    entry.orient = await Promise.all(entry.urls.map(probeOrientation))
+  }
+}
+
+function probeOrientation(u) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const timer = setTimeout(() => {
+      img.onload = img.onerror = null
+      resolve('portrait')
+    }, 2500)
+    img.onload = () => {
+      clearTimeout(timer)
+      resolve(img.naturalWidth > img.naturalHeight ? 'landscape' : 'portrait')
+    }
+    img.onerror = () => {
+      clearTimeout(timer)
+      resolve('portrait')
+    }
+    img.src = u
+  })
 }
