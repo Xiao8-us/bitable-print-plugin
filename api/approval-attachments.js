@@ -33,15 +33,76 @@ async function tenantToken() {
   return r.tenant_access_token
 }
 
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms))
+
 async function larkGet(token, url) {
-  const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then((x) => x.json())
-  if (r.code !== 0) throw new Error(`lark api ${url.split('?')[0]} error ${r.code}: ${r.msg}`)
-  return r.data || {}
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then((x) =>
+      x.json()
+    )
+    if (r.code === 0) return r.data || {}
+    if (r.code === 99991400 || r.code === 99991401) {
+      await sleep(1200 * (attempt + 1))
+      continue
+    }
+    throw new Error(`lark api ${url.split('?')[0]} error ${r.code}: ${r.msg}`)
+  }
+  throw new Error('lark api rate limit exceeded')
 }
 
 function serialDateMs(ms) {
   const d = new Date(Number(ms) + 8 * 3600 * 1000)
   return d.toISOString().slice(0, 10).replace(/-/g, '')
+}
+
+// 简单内存缓存：实例列表 / 实例详情 / 查询结果
+const listCache = new Map()
+const detailCache = new Map()
+const resultCache = new Map()
+const CACHE_TTL = 30 * 60 * 1000
+
+function cacheGet(map, key) {
+  const e = map.get(key)
+  if (!e) return null
+  if (Date.now() - e.t > CACHE_TTL) {
+    map.delete(key)
+    return null
+  }
+  return e.v
+}
+
+function cacheSet(map, key, v) {
+  map.set(key, { v, t: Date.now() })
+}
+
+async function larkListCodes(token, def, ws, we, pageToken) {
+  const q = new URLSearchParams({
+    approval_code: def,
+    page_size: '100',
+    start_time: String(ws),
+    end_time: String(we)
+  })
+  if (pageToken) q.set('page_token', pageToken)
+  const url = `https://open.feishu.cn/open-apis/approval/v4/instances?${q.toString()}`
+  const ck = `${def}|${ws}|${we}|${pageToken || ''}`
+  let d = cacheGet(listCache, ck)
+  if (!d) {
+    d = await larkGet(token, url)
+    cacheSet(listCache, ck, d)
+  }
+  return d
+}
+
+async function larkInstanceDetail(token, code) {
+  let d = cacheGet(detailCache, code)
+  if (!d) {
+    d = await larkGet(
+      token,
+      `https://open.feishu.cn/open-apis/approval/v4/instances/${encodeURIComponent(code)}`
+    )
+    cacheSet(detailCache, code, d)
+  }
+  return d
 }
 
 function extractAttachmentUrls(form) {
@@ -72,43 +133,34 @@ async function findInstanceBySerial(token, serial, date) {
     .filter(Boolean)
   const HOUR = 3600 * 1000
   const DAY = 24 * HOUR
-  // 接口要求每次查询区间 ≤10 小时，且必须带 start_time/end_time。
-  // 以报销日期为锚点，往前 3 天、往后 1 天，按 10 小时窗口分片扫描。
   const base = date
     ? Date.parse(`${date}T00:00:00+08:00`)
     : Math.floor(Date.now() / HOUR) * HOUR
-  const from = Number.isFinite(base) ? base - 3 * DAY : Date.now() - 7 * DAY
-  const to = Number.isFinite(base) ? base + 1 * DAY : Date.now()
+  const days = Number.isFinite(base)
+    ? [0, -1] // 先查报销当天，找不到再查前一天
+    : [0]
+  if (!Number.isFinite(base)) days[0] = Date.now()
   for (const def of defs) {
-    for (let ws = from; ws < to; ws += 10 * HOUR) {
-      const we = Math.min(ws + 10 * HOUR, to)
-      let pageToken = ''
-      for (let page = 0; page < 10; page++) {
-        const q = new URLSearchParams({
-          approval_code: def,
-          page_size: '100',
-          start_time: String(ws),
-          end_time: String(we)
-        })
-        if (pageToken) q.set('page_token', pageToken)
-        const d = await larkGet(
-          token,
-          `https://open.feishu.cn/open-apis/approval/v4/instances?${q.toString()}`
-        )
-        const codes =
-          d.instance_code_list || d.instance_codes || (Array.isArray(d) ? d : [])
-        for (const code of codes) {
-          const detail = await larkGet(
-            token,
-            `https://open.feishu.cn/open-apis/approval/v4/instances/${encodeURIComponent(code)}`
-          )
-          if (String(detail.serial_number || '') === serial) {
-            return detail
+    for (const off of days) {
+      const from = Number.isFinite(base) ? base + off * DAY : base
+      const to = from + DAY
+      for (let ws = from; ws < to; ws += 10 * HOUR) {
+        const we = Math.min(ws + 10 * HOUR, to)
+        let pageToken = ''
+        for (let page = 0; page < 10; page++) {
+          const d = await larkListCodes(token, def, ws, we, pageToken)
+          const codes =
+            d.instance_code_list || d.instance_codes || (Array.isArray(d) ? d : [])
+          for (const code of codes) {
+            const detail = await larkInstanceDetail(token, code)
+            if (String(detail.serial_number || '') === serial) {
+              return detail
+            }
           }
+          if (!d.has_more) break
+          pageToken = d.page_token || ''
+          if (!pageToken) break
         }
-        if (!d.has_more) break
-        pageToken = d.page_token || ''
-        if (!pageToken) break
       }
     }
   }
@@ -130,10 +182,15 @@ export default async function handler(req, res) {
   }
   try {
     const token = await tenantToken()
+    const rk = serial + '|' + (date || '')
+    const hit = cacheGet(resultCache, rk)
+    if (hit) return json(res, 200, hit)
     const inst = await findInstanceBySerial(token, serial, date)
     if (!inst) return json(res, 404, { ok: false, error: 'instance not found' })
     const urls = extractAttachmentUrls(inst.form)
-    return json(res, 200, { ok: true, urls })
+    const body = { ok: true, urls }
+    cacheSet(resultCache, rk, body)
+    return json(res, 200, body)
   } catch (e) {
     return json(res, 502, { ok: false, error: String(e?.message || e) })
   }
