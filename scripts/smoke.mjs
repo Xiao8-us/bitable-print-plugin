@@ -129,6 +129,22 @@ checks.push(['长明细自动分行2行', (ehtml2.match(/exp-data/g) || []).leng
 checks.push(['每行金额拆出', ehtml2.includes('300.00') && ehtml2.includes('200.00')])
 checks.push(['自动合计并转大写', ehtml2.includes('伍佰元整') && ehtml2.includes('500.00')])
 
+const et3 = expenseTemplate()
+const ehtml3 = renderAll(et3, [
+  {
+    recordId: 'e3',
+    fields: {
+      c1: '美驿云仓',
+      c2: '2026-08-29',
+      c3: '202608290001',
+      c4: '报销内容:购买电梯风扇 | 日期（年-月-日）:2026-08-29 00:00:00 | 金额:74.000000 CNY',
+      c5: ''
+    }
+  }
+])
+checks.push(['结构化明细清洗', ehtml3.includes('购买电梯风扇（8/29）') && !ehtml3.includes('报销内容:') && !ehtml3.includes('CNY')])
+checks.push(['清洗后金额与合计', ehtml3.includes('74.00') && ehtml3.includes('柒拾肆元整')])
+
 // 通用模板 A5
 const tA5 = JSON.parse(JSON.stringify(t))
 tA5.paper = 'a5'

@@ -52,6 +52,26 @@ function extractAmount(text) {
   return null
 }
 
+// 把审批明细行清洗成可读内容：
+// “报销内容:购买电梯风扇 | 日期（年-月-日）:2026-08-29 00:00:00 | 金额:74.000000 CNY”
+//  → { text: “购买电梯风扇（8/29）”, amount: 74 }
+function parseDetailLine(line) {
+  const s = String(line || '').trim()
+  const contentM = s.match(/报销内容[:：]\s*([^|]+)/)
+  if (contentM) {
+    const content = contentM[1].trim()
+    const dateM = s.match(/日期[^:：]*[:：]\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+    const amountM = s.match(/金额[:：]\s*([\d,]+(?:\.\d{1,2})?)/)
+    const date = dateM ? `${Number(dateM[2])}/${Number(dateM[3])}` : ''
+    return {
+      text: date ? `${content}（${date}）` : content,
+      amount: amountM ? parseFloat(amountM[1].replace(/,/g, '')) : null,
+      structured: true
+    }
+  }
+  return { text: s, amount: extractAmount(s), structured: false }
+}
+
 function fmtAmount(n) {
   return Number(n).toFixed(2)
 }
@@ -86,7 +106,7 @@ function shortUrl(u) {
   return String(u).replace(/^https?:\/\//, '').slice(0, 90)
 }
 
-function attachmentsHtml(record, fieldId, cached, perRow) {
+function attachmentsHtml(record, fieldId, cached, perRow, webOnly = false) {
   if (!record || !fieldId) return ''
   const raw = record.fields?.[fieldId]
   let items = []
@@ -104,8 +124,11 @@ function attachmentsHtml(record, fieldId, cached, perRow) {
       ? `<div class="attach-empty">附件无法预览：${esc(String(raw).slice(0, 80))}</div>`
       : ''
   }
-  const imgs = items.filter((i) => i.kind === 'img')
   const links = items.filter((i) => i.kind === 'link')
+  const imgs = items.filter((i) => i.kind === 'img')
+  if (webOnly && !imgs.length && links.length) {
+    return '<div class="attach-empty">含审批附件：请在模板映射里填写「票据接口地址」，打印时将自动取回票据图片</div>'
+  }
   const grid = imgs.length
     ? `<div class="attach-grid" style="grid-template-columns:repeat(${perRow},1fr)">${imgs
         .map(
@@ -356,17 +379,17 @@ function renderExpense(template, record, page, pages) {
   if (itemRaw) {
     const parts = splitDetails(itemRaw)
     if (parts.length) {
-      for (const p of parts) detailLines.push({ text: p, amount: extractAmount(p) })
+      for (const p of parts) detailLines.push(parseDetailLine(p))
     } else {
-      detailLines.push({ text: itemRaw, amount: extractAmount(itemRaw) })
+      detailLines.push(parseDetailLine(itemRaw))
     }
   }
   const autoRows = cfg.autoRows !== false && detailLines.length > 1
-  const linesToShow = autoRows ? detailLines : [{ text: itemRaw, amount: declaredAmount }]
-  const parsedSum = autoRows
-    ? detailLines.reduce((sum, l) => sum + (l.amount || 0), 0)
-    : 0
-  const total = autoRows && parsedSum > 0 && !declaredAmount ? fmtAmount(parsedSum) : declaredAmount
+  const linesToShow = autoRows
+    ? detailLines
+    : [detailLines[0] || { text: '', amount: null }]
+  const parsedSum = detailLines.reduce((sum, l) => sum + (l.amount || 0), 0)
+  const total = declaredAmount || (parsedSum > 0 ? fmtAmount(parsedSum) : '')
   const upper = val(cfg.uppercase) || amountUpperCn(total)
   const extraBlanks = autoRows ? Math.max(0, linesToShow.length - 1) : 0
   const emptyRows = Math.min(Math.max(Number(cfg.emptyRows) || 3, 0), 6)
@@ -374,8 +397,9 @@ function renderExpense(template, record, page, pages) {
 
   let dataRows = ''
   for (const line of linesToShow) {
-    const amt = autoRows && line.amount != null ? fmtAmount(line.amount) : declaredAmount
-  dataRows += `<tr class="exp-data"><td class="exp-item">${esc(line.text)}</td><td class="exp-amt">${esc(amt || '')}</td><td class="exp-opinion-cell"></td></tr>`
+    const amt =
+      declaredAmount || (line.amount != null ? fmtAmount(line.amount) : '')
+    dataRows += `<tr class="exp-data"><td class="exp-item">${esc(line.text)}</td><td class="exp-amt">${esc(amt || '')}</td><td class="exp-opinion-cell"></td></tr>`
   }
   for (let i = 0; i < blanksAfter; i++) {
     dataRows += '<tr class="exp-blank"><td></td><td></td><td class="exp-opinion-cell"></td></tr>'
@@ -387,7 +411,7 @@ function renderExpense(template, record, page, pages) {
   let attachHtml = ''
   if (cfg.attachment && record) {
     const cached = attachCache.get(`${record.recordId}|${cfg.attachment}`)
-    const inner = attachmentsHtml(record, cfg.attachment, cached, 2)
+      const inner = attachmentsHtml(record, cfg.attachment, cached, 2, true)
     if (inner) {
       attachHtml = `<div class="exp-attach"><div class="exp-sec-title">附件票据</div>${inner}</div>`
     }
