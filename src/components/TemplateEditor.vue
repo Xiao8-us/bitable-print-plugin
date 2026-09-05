@@ -273,6 +273,13 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
           <span>出纳（打印内容，可留空）</span>
           <input v-model="currentTemplate.expense.cashierText" class="input" placeholder="如：李出纳" />
         </label>
+        <label class="field">
+          <span>领款人（取表格字段）</span>
+          <select class="input" :value="currentTemplate.expense.payerField" @change="currentTemplate.expense.payerField = $event.target.value">
+            <option value="">（留空=手写）</option>
+            <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </label>
       </div>
       <label class="check-line expense-map-toggle">
         <input v-model="currentTemplate.expense.autoRows" type="checkbox" />

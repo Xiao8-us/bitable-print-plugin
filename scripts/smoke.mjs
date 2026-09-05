@@ -125,6 +125,22 @@ const ehtml5 = renderAll(et5, [
 ])
 checks.push(['复核/出纳输入可打印', ehtml5.includes('复核：</span><div class="exp-sign-filled">张三') && ehtml5.includes('李四')])
 
+et5.expense.payerField = 'payer'
+const ehtml6 = renderAll(et5, [
+  {
+    recordId: 'e6',
+    fields: {
+      c1: '岛链公司',
+      c2: '2026-09-03',
+      c3: '202609030001',
+      c4: 'x',
+      c5: '1',
+      payer: '胡清华'
+    }
+  }
+])
+checks.push(['领款人取字段打印', ehtml6.includes('领款人：</span><div class="exp-sign-filled">胡清华')])
+
 const et2 = expenseTemplate()
 const ehtml2 = renderAll(et2, [
   {

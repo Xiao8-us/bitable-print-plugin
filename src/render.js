@@ -450,6 +450,7 @@ function expenseFormHtml(template, record) {
   const capRow = `<tr class="exp-cap-row"><td class="exp-cap-label">金额大写：</td><td class="exp-cap-value" colspan="2">${esc(upper)}</td></tr>`
   const signCell = (txt) =>
     txt ? `<div class="exp-sign-filled">${esc(txt)}</div>` : '<div class="exp-sign-space"></div>'
+  const payerName = cfg.payerField ? val(cfg.payerField) : ''
 
   return (page, pages) => {
     const footer = fillVars(template.footer || '', { page, pages })
@@ -480,7 +481,7 @@ function expenseFormHtml(template, record) {
   <div class="exp-sign">
     <div class="exp-sign-cell"><span class="exp-sign-label">复核：</span>${signCell(cfg.reviewerText)}</div>
     <div class="exp-sign-cell"><span class="exp-sign-label">出纳：</span>${signCell(cfg.cashierText)}</div>
-    <div class="exp-sign-cell"><span class="exp-sign-label">领款人：</span><div class="exp-sign-space"></div></div>
+    <div class="exp-sign-cell"><span class="exp-sign-label">领款人：</span>${signCell(payerName)}</div>
   </div>
   ${footer ? `<div class="page-footer">${footer}</div>` : ''}
   <div class="exp-page-no">${page}/${pages}</div>

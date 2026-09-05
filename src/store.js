@@ -61,6 +61,7 @@ export function expenseTemplate() {
   const item = pick(['报销事由', '费用明细', '明细', '报销内容', '用途', '事由', '费用说明', '说明', '摘要'])
   const amount = pick(['报销金额', '金额', '费用汇总', '汇总金额', '总额', '合计'])
   const direct = pick(['票据直链', '票据链接', '附件直链', '直链'])
+  const payer = pick(['领款人', '收款人', '报销人'])
   const att =
     matchField(['附件', '票据', '凭证', '图片', '上传', '发票'], used, [FieldType.Attachment]) ||
     pick(['附件', '票据', '凭证', '图片', '上传', '发票'])
@@ -91,6 +92,7 @@ export function expenseTemplate() {
       depRows: 0,
       reviewerText: '',
       cashierText: '',
+      payerField: payer?.id || '',
       autoRows: true
     }
   }
