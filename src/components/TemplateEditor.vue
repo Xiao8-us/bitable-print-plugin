@@ -265,6 +265,14 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
             <option :value="6">6 行</option>
           </select>
         </label>
+        <label class="field">
+          <span>复核（打印内容，可留空）</span>
+          <input v-model="currentTemplate.expense.reviewerText" class="input" placeholder="如：王财务" />
+        </label>
+        <label class="field">
+          <span>出纳（打印内容，可留空）</span>
+          <input v-model="currentTemplate.expense.cashierText" class="input" placeholder="如：李出纳" />
+        </label>
       </div>
       <label class="check-line expense-map-toggle">
         <input v-model="currentTemplate.expense.autoRows" type="checkbox" />

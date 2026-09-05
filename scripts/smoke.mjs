@@ -114,6 +114,17 @@ checks.push(['金额大写行', ehtml.includes('叁佰元整')])
 checks.push(['合计行', ehtml.includes('合　计')])
 checks.push(['三栏签字', ehtml.includes('领款人') && ehtml.includes('出纳') && ehtml.includes('复核')])
 
+const et5 = expenseTemplate()
+et5.expense.reviewerText = '张三'
+et5.expense.cashierText = '李四'
+const ehtml5 = renderAll(et5, [
+  {
+    recordId: 'e5',
+    fields: { c1: '岛链公司', c2: '2026-09-03', c3: '202609030001', c4: 'x', c5: '1' }
+  }
+])
+checks.push(['复核/出纳输入可打印', ehtml5.includes('复核：</span><div class="exp-sign-filled">张三') && ehtml5.includes('李四')])
+
 const et2 = expenseTemplate()
 const ehtml2 = renderAll(et2, [
   {

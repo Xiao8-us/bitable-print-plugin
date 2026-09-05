@@ -65,6 +65,7 @@ export const PRINT_CSS = `
   .exp-sign-cell + .exp-sign-cell { border-left: 1px solid #1f2329; }
   .exp-sign-label { font-size: 9.5pt; white-space: nowrap; }
   .exp-sign-space { height: 10mm; }
+  .exp-sign-filled { font-size: 11pt; font-weight: 600; margin-top: 4mm; letter-spacing: 2px; border-bottom: 1px solid #c9cdd4; padding-bottom: 1mm; }
   .exp-attach { margin-top: 3mm; }
   .exp-sec-title { font-weight: 600; font-size: 10pt; margin-bottom: 1.5mm; }
   .attach-page-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #1f2329; padding-bottom: 2mm; margin-bottom: 4mm; }

@@ -89,6 +89,8 @@ export function expenseTemplate() {
       directField: direct?.id || '',
       emptyRows: 3,
       depRows: 0,
+      reviewerText: '',
+      cashierText: '',
       autoRows: true
     }
   }

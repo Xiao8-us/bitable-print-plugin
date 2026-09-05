@@ -874,6 +874,15 @@ textarea.input {
   height: 10mm;
 }
 
+.exp-sign-filled {
+  font-size: 11pt;
+  font-weight: 600;
+  margin-top: 4mm;
+  letter-spacing: 2px;
+  border-bottom: 1px solid #c9cdd4;
+  padding-bottom: 1mm;
+}
+
 .exp-attach {
   margin-top: 3mm;
 }
