@@ -60,11 +60,9 @@ function parseDetailLine(line) {
   const contentM = s.match(/报销内容[:：]\s*([^|]+)/)
   if (contentM) {
     const content = contentM[1].trim()
-    const dateM = s.match(/日期[^:：]*[:：]\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
     const amountM = s.match(/金额[:：]\s*([\d,]+(?:\.\d{1,2})?)/)
-    const date = dateM ? `${Number(dateM[2])}/${Number(dateM[3])}` : ''
     return {
-      text: date ? `${content}（${date}）` : content,
+      text: content,
       amount: amountM ? parseFloat(amountM[1].replace(/,/g, '')) : null,
       structured: true
     }

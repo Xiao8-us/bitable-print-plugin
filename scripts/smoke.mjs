@@ -171,7 +171,7 @@ const ehtml3 = renderAll(et3, [
     }
   }
 ])
-checks.push(['明细缩略仅保留内容', ehtml3.includes('购买电梯风扇') && !ehtml3.includes('报销内容:') && !ehtml3.includes('CNY')])
+checks.push(['明细缩略仅保留内容', ehtml3.includes('购买电梯风扇') && !ehtml3.includes('报销内容:') && !ehtml3.includes('CNY') && !ehtml3.includes('8/29')])
 checks.push(['金额拆出与大写', ehtml3.includes('74.00') && ehtml3.includes('柒拾肆元整')])
 
 // 附件独立成第二页
