@@ -1,0 +1,27 @@
+name: Sync Approval Attachments
+
+on:
+  schedule:
+    - cron: '17 * * * *'   # 每小时第 17 分钟跑一次
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Sync approval attachment links
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          BASE_TOKEN: ${{ secrets.BASE_TOKEN }}
+          TABLE_ID: ${{ secrets.TABLE_ID }}
+        run: node scripts/sync-approval-links.mjs

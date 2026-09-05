@@ -235,6 +235,13 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
             <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
           </select>
         </label>
+        <label class="field">
+          <span>票据直链字段（同步后自动带出图片）</span>
+          <select class="input" :value="currentTemplate.expense.directField" @change="currentTemplate.expense.directField = $event.target.value">
+            <option value="">（无）</option>
+            <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
+          </select>
+        </label>
         <label class="field field-wide">
           <span>票据接口地址（部署小后端后填写）</span>
           <input v-model="currentTemplate.expense.approvalUrl" class="input" placeholder="https://你的后端域名/api/approval-attachments（留空=不自动拉取）" />

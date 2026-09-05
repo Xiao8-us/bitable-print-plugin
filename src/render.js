@@ -217,6 +217,17 @@ export async function enrichApprovalAttachments(template, records) {
     if (attachCache.has(key)) continue
     const serial = extractSerial(r.fields?.[cfg.serialField])
     if (!serial) continue
+    // 直链字段优先：有票据直链就不再调接口
+    const directUrls = cfg.directField
+      ? String(r.fields?.[cfg.directField] || '')
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter((s) => /^https?:\/\//.test(s) && !/previewAttachment/.test(s))
+      : []
+    if (directUrls.length) {
+      attachCache.set(key, { urls: directUrls, nonImages: 0 })
+      continue
+    }
     try {
       const dateRaw = String(r.fields?.[cfg.date] || '').replace(/\D/g, '').slice(0, 8)
       const url = `${base}?serial=${encodeURIComponent(serial)}&date=${encodeURIComponent(dateRaw)}`
