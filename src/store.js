@@ -93,6 +93,7 @@ export function expenseTemplate() {
       reviewerText: '',
       cashierText: '',
       payerField: payer?.id || '',
+      detailMode: 'brief',
       autoRows: true
     }
   }

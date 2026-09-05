@@ -254,6 +254,13 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
           </select>
         </label>
         <label class="field">
+          <span>费用明细显示</span>
+          <select class="input" :value="currentTemplate.expense.detailMode || 'brief'" @change="currentTemplate.expense.detailMode = $event.target.value">
+            <option value="brief">缩略（仅保留报销内容）</option>
+            <option value="raw">原文（含日期/金额等）</option>
+          </select>
+        </label>
+        <label class="field">
           <span>部门主管意见占行数</span>
           <select class="input" :value="Number(currentTemplate.expense.depRows) || 0" @change="currentTemplate.expense.depRows = Number($event.target.value)">
             <option :value="0">自动（与领导框均分）</option>

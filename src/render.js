@@ -412,11 +412,13 @@ function expenseFormHtml(template, record) {
     if (parts.length) {
       for (const p of parts) {
         const parsed = parseDetailLine(p)
-        detailLines.push({ text: p, amount: parsed.amount })
+        const text = cfg.detailMode === 'raw' ? p : parsed.text
+        detailLines.push({ text, amount: parsed.amount })
       }
     } else {
       const parsed = parseDetailLine(itemRaw)
-      detailLines.push({ text: itemRaw, amount: parsed.amount })
+      const text = cfg.detailMode === 'raw' ? itemRaw : parsed.text
+      detailLines.push({ text, amount: parsed.amount })
     }
   }
   const autoRows = cfg.autoRows !== false && detailLines.length > 1
