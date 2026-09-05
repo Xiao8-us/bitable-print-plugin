@@ -210,13 +210,11 @@ export function extractSerial(text) {
 export async function enrichApprovalAttachments(template, records) {
   if (!template || template.kind !== 'expense' || !records?.length) return
   const cfg = template.expense
-  if (!cfg?.approvalUrl || !cfg?.serialField || !cfg?.attachment) return
-  const base = String(cfg.approvalUrl).replace(/\/+$/, '')
+  if (!cfg?.attachment) return
+  const base = cfg.approvalUrl ? String(cfg.approvalUrl).replace(/\/+$/, '') : ''
   for (const r of records.slice(0, 30)) {
     const key = `${r.recordId}|${cfg.attachment}`
     if (attachCache.has(key)) continue
-    const serial = extractSerial(r.fields?.[cfg.serialField])
-    if (!serial) continue
     // 直链字段优先：有票据直链就不再调接口
     const directUrls = cfg.directField
       ? String(r.fields?.[cfg.directField] || '')
@@ -228,6 +226,9 @@ export async function enrichApprovalAttachments(template, records) {
       attachCache.set(key, { urls: directUrls, nonImages: 0 })
       continue
     }
+    if (!base || !cfg.serialField) continue
+    const serial = extractSerial(r.fields?.[cfg.serialField])
+    if (!serial) continue
     try {
       const dateRaw = String(r.fields?.[cfg.date] || '').replace(/\D/g, '').slice(0, 8)
       const url = `${base}?serial=${encodeURIComponent(serial)}&date=${encodeURIComponent(dateRaw)}`
