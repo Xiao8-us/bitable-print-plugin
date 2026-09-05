@@ -219,10 +219,17 @@ export async function enrichApprovalAttachments(template, records) {
     if (!serial) continue
     try {
       const dateRaw = String(r.fields?.[cfg.date] || '').replace(/\D/g, '').slice(0, 8)
-      const res = await fetch(
-        `${base}?serial=${encodeURIComponent(serial)}&date=${encodeURIComponent(dateRaw)}`
-      )
-      const j = await res.json()
+      const url = `${base}?serial=${encodeURIComponent(serial)}&date=${encodeURIComponent(dateRaw)}`
+      const fetched = await fetchWithRetry(url, 2)
+      if (fetched.err) {
+        attachCache.set(key, {
+          urls: [],
+          nonImages: 0,
+          msg: '票据接口请求失败（已重试）：' + (fetched.err?.message || 'Failed to fetch')
+        })
+        continue
+      }
+      const j = await fetched.res.json()
       if (j?.ok) {
         if (Array.isArray(j.urls) && j.urls.length) {
           attachCache.set(key, { urls: j.urls, nonImages: 0 })
@@ -244,6 +251,26 @@ export async function enrichApprovalAttachments(template, records) {
       })
     }
   }
+}
+
+async function fetchWithRetry(url, retries) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 50000)
+    try {
+      const res = await fetch(url, { signal: ctrl.signal })
+      clearTimeout(timer)
+      return { res }
+    } catch (err) {
+      clearTimeout(timer)
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)))
+        continue
+      }
+      return { err }
+    }
+  }
+  return { err: new Error('Failed to fetch') }
 }
 
 function valueFor(record, fid) {

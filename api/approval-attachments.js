@@ -60,6 +60,7 @@ function serialDateMs(ms) {
 const listCache = new Map()
 const detailCache = new Map()
 const resultCache = new Map()
+const notFoundCache = new Map()
 const CACHE_TTL = 30 * 60 * 1000
 
 function cacheGet(map, key) {
@@ -143,7 +144,8 @@ async function findInstanceBySerial(token, serial, date) {
         )
       : NaN
   const base = Number.isFinite(parsed) ? parsed : Date.now()
-  const days = [0, -1, -2, 1]
+  // 优先报销当天与前一天；命中即返回，减少调用避免超时
+  const days = [0, -1]
   const stats = { defs: defs.length, windows: 0, lists: 0, details: 0, codes: 0, serials: [] }
   for (const def of defs) {
     for (const off of days) {
@@ -195,9 +197,14 @@ export default async function handler(req, res) {
     const rk = serial + '|' + (date || '')
     const hit = cacheGet(resultCache, rk)
     if (hit) return json(res, 200, hit)
+    const nfAt = notFoundCache.get(rk)
+    if (nfAt && Date.now() - nfAt < 10 * 60 * 1000) {
+      return json(res, 404, { ok: false, error: 'instance not found', ver: VER })
+    }
     const found = await findInstanceBySerial(token, serial, date)
     const inst = found.detail
     if (!inst) {
+      notFoundCache.set(rk, Date.now())
       if (req.query.debug === '1') {
         return json(res, 404, {
           ok: false,

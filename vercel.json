@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/approval-attachments.js": {
+      "maxDuration": 60,
+      "regions": ["hkg1"]
+    }
+  }
+}
