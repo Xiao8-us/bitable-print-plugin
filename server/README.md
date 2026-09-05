@@ -1,5 +1,36 @@
 # 审批票据直链小后端（Vercel）
 
+> 注意：如果生产环境**不能访问外网（GitHub Pages / Vercel）**，请不要用 Vercel 方案，
+> 改用下面的「内网一体部署」。
+
+## 内网一体部署（推荐正式环境）
+
+一台内网服务器（或公司可公网访问的服务器）同时跑插件页面 + 票据接口：
+
+```bash
+npm install
+npm run build
+npm run serve            # 默认 0.0.0.0:8080
+```
+
+环境变量与接口相同（`FEISHU_APP_ID` / `FEISHU_APP_SECRET`，可选
+`APPROVAL_DEFINITIONS`）。生产建议用 Nginx/Caddy 反代并配 HTTPS
+（飞书自定义插件地址要求 https）。
+
+网络要求（重要）：
+
+- 飞书客户端 → 内网服务器：需能访问插件页面与接口（同一台，最简）
+- 内网服务器 → `open.feishu.cn`：服务器调审批接口取票据直链（飞书域名）
+- 飞书客户端 → `internal-api-drive-stream.feishu.cn`：加载票据图片
+
+也就是说：服务器只需要能出网访问飞书相关域名，客户端需要能访问飞书与内网服务器。
+
+插件里填写：
+- 票据接口地址：`https://你的域名/api/approval-attachments`
+- 插件安装地址：`https://你的域名/`
+
+## Vercel 部署（外网可用时的替代）
+
 用途：排版打印插件在浏览器里无法直接放应用密钥调审批接口。这个小后端（仓库根目录 `api/approval-attachments.js`）负责
 “按申请编号找到审批实例 → 取回票据附件直链”，插件再把这些直链图片印到报销单上。
 

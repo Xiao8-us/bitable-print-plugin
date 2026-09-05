@@ -30,6 +30,17 @@ npm run dev
 - 代码仓库：https://github.com/Xiao8-us/bitable-print-plugin
 - 修改代码后 `git push`，GitHub Actions 自动构建发布，1~2 分钟生效
 
+## 内网/正式环境部署（无法访问 GitHub Pages/Vercel 时）
+
+```bash
+npm install
+npm run build
+FEISHU_APP_ID=xxx FEISHU_APP_SECRET=xxx npm run serve
+```
+
+一个服务同时提供插件页面和 `/api/approval-attachments` 票据接口。
+建议前置 Nginx/Caddy 提供 HTTPS，详细说明见 [server/README.md](server/README.md)。
+
 ## 接入飞书多维表格
 
 插件需要一个**可访问的 HTTPS 网址**（localhost 除外）。
