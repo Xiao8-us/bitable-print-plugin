@@ -127,8 +127,7 @@ function attachmentsHtml(record, fieldId, cached, perRow, webOnly = false) {
   const links = items.filter((i) => i.kind === 'link')
   const imgs = items.filter((i) => i.kind === 'img')
   if (webOnly && !imgs.length && links.length) {
-    const msg =
-      cached?.msg || '含审批附件：请在模板映射里填写「票据接口地址」，打印时将自动取回票据图片'
+    const msg = cached?.msg || '含审批附件：请在模板映射里选择「票据直链字段」以自动打印票据图片'
     return `<div class="attach-empty">${esc(msg)}</div>`
   }
   const grid = imgs.length
@@ -211,11 +210,9 @@ export async function enrichApprovalAttachments(template, records) {
   if (!template || template.kind !== 'expense' || !records?.length) return
   const cfg = template.expense
   if (!cfg?.attachment) return
-  const base = cfg.approvalUrl ? String(cfg.approvalUrl).replace(/\/+$/, '') : ''
   for (const r of records.slice(0, 30)) {
     const key = `${r.recordId}|${cfg.attachment}`
     if (attachCache.has(key)) continue
-    // 直链字段优先：有票据直链就不再调接口
     const directUrls = cfg.directField
       ? String(r.fields?.[cfg.directField] || '')
           .split(/\r?\n/)
@@ -224,65 +221,8 @@ export async function enrichApprovalAttachments(template, records) {
       : []
     if (directUrls.length) {
       attachCache.set(key, { urls: directUrls, nonImages: 0 })
-      continue
-    }
-    if (!base || !cfg.serialField) continue
-    const serial = extractSerial(r.fields?.[cfg.serialField])
-    if (!serial) continue
-    try {
-      const dateRaw = String(r.fields?.[cfg.date] || '').replace(/\D/g, '').slice(0, 8)
-      const url = `${base}?serial=${encodeURIComponent(serial)}&date=${encodeURIComponent(dateRaw)}`
-      const fetched = await fetchWithRetry(url, 2)
-      if (fetched.err) {
-        attachCache.set(key, {
-          urls: [],
-          nonImages: 0,
-          msg: '票据接口请求失败（已重试）：' + (fetched.err?.message || 'Failed to fetch')
-        })
-        continue
-      }
-      const j = await fetched.res.json()
-      if (j?.ok) {
-        if (Array.isArray(j.urls) && j.urls.length) {
-          attachCache.set(key, { urls: j.urls, nonImages: 0 })
-        } else {
-          attachCache.set(key, { urls: [], nonImages: 1, msg: '该审批单没有取到图片附件' })
-        }
-      } else {
-        attachCache.set(key, {
-          urls: [],
-          nonImages: 1,
-          msg: '后端未找到该审批单：' + (j?.error || ('HTTP ' + res.status))
-        })
-      }
-    } catch (e) {
-      attachCache.set(key, {
-        urls: [],
-        nonImages: 0,
-        msg: '票据接口请求失败：' + (e?.message || '网络错误')
-      })
     }
   }
-}
-
-async function fetchWithRetry(url, retries) {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 50000)
-    try {
-      const res = await fetch(url, { signal: ctrl.signal })
-      clearTimeout(timer)
-      return { res }
-    } catch (err) {
-      clearTimeout(timer)
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)))
-        continue
-      }
-      return { err }
-    }
-  }
-  return { err: new Error('Failed to fetch') }
 }
 
 function valueFor(record, fid) {

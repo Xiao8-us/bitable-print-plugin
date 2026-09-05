@@ -242,10 +242,6 @@ const typeTag = { meta: '单', table: '表', text: '文', sign: '签', attachmen
             <option v-for="f in ds.fields" :key="f.id" :value="f.id">{{ f.name }}</option>
           </select>
         </label>
-        <label class="field field-wide">
-          <span>票据接口地址（部署小后端后填写）</span>
-          <input v-model="currentTemplate.expense.approvalUrl" class="input" placeholder="https://你的后端域名/api/approval-attachments（留空=不自动拉取）" />
-        </label>
         <label class="field">
           <span>明细空行数（供手写加行）</span>
           <select class="input" :value="Number(currentTemplate.expense.emptyRows) || 3" @change="currentTemplate.expense.emptyRows = Number($event.target.value)">

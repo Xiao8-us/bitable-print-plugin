@@ -5,7 +5,6 @@ import { currentTemplate } from '../store.js'
 import {
   collectAttachmentBlocks,
   enrichApprovalAttachments,
-  extractSerial,
   inspectAttachmentOrientations,
   renderAll
 } from '../render.js'
@@ -65,14 +64,8 @@ function ensureExpenseAttachMsg(t, recs) {
     if (!entry.msg) {
       if (cfg.directField) {
         entry.msg = '该记录暂无票据直链：等待每小时自动同步，或稍后点「重试拉取票据」'
-      } else if (!cfg.approvalUrl) {
-        entry.msg = '请在映射里选择「票据直链字段」或填写「票据接口地址」'
-      } else if (!cfg.serialField) {
-        entry.msg = '未选择「审批单号字段」，无法取票据'
-      } else if (!extractSerial(r.fields?.[cfg.serialField])) {
-        entry.msg = '该记录缺少「申请编号」，无法取审批票据'
       } else {
-        entry.msg = '票据图片拉取失败，请点「重试拉取」'
+        entry.msg = '请在映射里选择「票据直链字段」以自动打印票据图片'
       }
     }
   }
