@@ -170,7 +170,9 @@ export async function main() {
   console.log(JSON.stringify(report, null, 2))
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+import { pathToFileURL } from 'node:url'
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().then(
     () => process.exit(0),
     (e) => {
