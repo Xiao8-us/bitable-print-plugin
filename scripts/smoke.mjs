@@ -120,7 +120,7 @@ et5.expense.cashierText = '李四'
 const ehtml5 = renderAll(et5, [
   {
     recordId: 'e5',
-    fields: { c1: '岛链公司', c2: '2026-09-03', c3: '202609030001', c4: 'x', c5: '1' }
+    fields: { c1: '示例公司', c2: '2026-09-03', c3: '202601010001', c4: 'x', c5: '1' }
   }
 ])
 checks.push(['复核/出纳输入可打印', ehtml5.includes('复核：</span><div class="exp-sign-filled">张三') && ehtml5.includes('李四')])
@@ -132,7 +132,7 @@ const ehtml6 = renderAll(et5, [
     fields: {
       c1: '岛链公司',
       c2: '2026-09-03',
-      c3: '202609030001',
+      c3: '202601010001',
       c4: 'x',
       c5: '1',
       payer: '胡清华'
@@ -165,7 +165,7 @@ const ehtml3 = renderAll(et3, [
     fields: {
       c1: '美驿云仓',
       c2: '2026-08-29',
-      c3: '202608290001',
+      c3: '202601010002',
       c4: '报销内容:购买电梯风扇 | 日期（年-月-日）:2026-08-29 00:00:00 | 金额:74.000000 CNY',
       c5: ''
     }
@@ -185,7 +185,7 @@ const ehtml4 = renderAll(et4, [
     fields: {
       c1: '岛链公司',
       c2: '2026-09-03',
-      c3: '202609030001',
+      c3: '202601010003',
       c4: '飞书商业专业版升级',
       c5: '960',
       x: '[1 个附件](https://www.feishu.cn/approval/admin/previewAttachment?key=ABC)'
@@ -216,8 +216,8 @@ const recB = {
 const htmlB = renderAll({ ...tA5, blocks: [attachBlock] }, [recB])
 checks.push(['图片直链多张横排', (htmlB.match(/<img /g) || []).length === 2 && htmlB.includes('r1.png') && htmlB.includes('r2.jpg')])
 
-checks.push(['从申请编号提取流水号', extractSerial('[202609030001](https://applink.feishu.cn/x)') === '202609030001'])
-checks.push(['纯数字提取流水号', extractSerial('单号 202608290001 备注') === '202608290001'])
+checks.push(['从申请编号提取流水号', extractSerial('[202601010001](https://applink.feishu.cn/x)') === '202601010001'])
+checks.push(['纯数字提取流水号', extractSerial('单号 202601010002 备注') === '202601010002'])
 
 let failed = false
 for (const [name, ok] of checks) {

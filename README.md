@@ -1,19 +1,20 @@
 # 排版打印 - 飞书多维表格自建插件
 
-仿照多维表格官方“排版打印 DocuGenius”做的一个自建侧边栏插件：
+基于多维表格数据生成 A5 横版“费用报销单”（含审批栏、金额大写、签字栏），
+并把审批票据图片自动打印到附件页。
 
-- 多套模板管理（新建 / 复制 / 重命名 / 删除 / 导出导入 JSON）
-- 简易模板编辑器：字段点击插入、字段拖入单据区/明细表、文本/表格/签名区等区块自由编排
-- 两种打印模式：**一单一页**（每张记录一页，适合出库单/送货单/工单）、**汇总列表**（明细表列出所有记录）
-- 记录选择：调用飞书自带记录选择弹窗、全选当前视图、搜索勾选
-- 输出：浏览器打印 / 存为 PDF / 导出 CSV / 导出 Word
-- 模板按“多维表格”分别保存，换表自动切换各自的模板集
+## 使用中的架构（正式链路）
 
-## 技术栈
+```text
+GitHub Actions（定时同步，每小时）
+  └─ 读取报销表「申请编号 / 附件」→ 调飞书审批接口 → 票据直链写入「票据直链」字段
 
-- Vue 3 + Vite
-- `@lark-base-open/js-sdk`（飞书多维表格扩展脚本官方 SDK）
-- 无后端，纯静态页面；插件本质是嵌入多维表格侧边栏的 iframe 网页
+飞书多维表格插件（GitHub Pages 托管）
+  └─ 读取「票据直链」字段 → 打印时显示票据图片
+```
+
+- 插件只读表格字段，不依赖任何第三方接口
+- 票据直链每小时自动刷新，多人打印无压力
 
 ## 本地开发
 
@@ -22,83 +23,32 @@ npm install
 npm run dev
 ```
 
-浏览器打开 http://localhost:5173 即可看到**演示模式**（内置示例订单数据，可完整体验编辑/选记录/预览/打印）。真实连接多维表格时，插件会通过 SDK 读取当前表格的字段和记录。
+浏览器打开 http://localhost:5173 为演示模式（示例数据）。
 
-## 已部署站点（GitHub Pages）
+## 定时同步配置
 
-- 正式地址：https://xiao8-us.github.io/bitable-print-plugin/
-- 代码仓库：https://github.com/Xiao8-us/bitable-print-plugin
-- 修改代码后 `git push`，GitHub Actions 自动构建发布，1~2 分钟生效
+工作流：`.github/workflows/sync-approval-links.yml`
 
-## 内网/正式环境部署（无法访问 GitHub Pages/Vercel 时）
+需要的 GitHub Secrets（仓库 Settings → Secrets and variables → Actions）：
 
-```bash
-npm install
-npm run build
-FEISHU_APP_ID=xxx FEISHU_APP_SECRET=xxx npm run serve
-```
+| 名称 | 说明 |
+| --- | --- |
+| `FEISHU_APP_ID` | 飞书自建应用 App ID |
+| `FEISHU_APP_SECRET` | 应用 App Secret |
+| `BASE_TOKEN` | 报销表多维表格 app token |
+| `TABLE_ID` | 报销表数据表 id |
+| `APPROVAL_DEFINITIONS` | 审批定义 code（多个用英文逗号分隔） |
 
-一个服务同时提供插件页面和 `/api/approval-attachments` 票据接口。
-建议前置 Nginx/Caddy 提供 HTTPS，详细说明见 [server/README.md](server/README.md)。
+手动触发：Actions → Sync Approval Attachments → Run workflow。
 
-## 接入飞书多维表格
+## 插件接入飞书
 
-插件需要一个**可访问的 HTTPS 网址**（localhost 除外）。
-
-### 方式一：本地开发 + 内网穿透（临时测试）
-
-```bash
-# 终端 1：启动本地服务
-npm run dev
-
-# 终端 2：cloudflared 临时隧道（免费，无需注册）
-cloudflared tunnel --url http://localhost:5173
-```
-
-把输出的 `https://xxx.trycloudflare.com` 填入飞书。
-
-### 方式二：正式部署（推荐）
-
-```bash
-npm run build
-```
-
-把 `dist/` 目录部署到任意静态托管：
-
-- GitHub Pages / Vercel / Netlify
-- 公司 Nginx / 对象存储 CDN
-
-部署后得到正式 https 地址，填入飞书即可。
-
-### 在飞书里添加插件
-
-1. 打开目标多维表格
-2. 右上角「插件」→「自定义插件」
-3. 「＋ 新增插件」，填入上面的 URL，确定
-4. 插件加载后，右上角提示「已连接」即成功；如果显示「演示模式」，说明 URL 无法访问或不在飞书环境中
-
-## 使用流程
-
-1. **编辑模板**：点字段插入到文本，或拖到「单据信息 / 明细表」；设置标题、纸张、打印模式
-2. **选记录**：在表格中选择（弹窗）/ 全选当前视图 / 搜索勾选
-3. **预览打印**：预览效果 → 打印 / 存为 PDF / 导出 CSV / 导出 Word
+1. `npm run build`，把 `dist/` 部署到静态托管（当前为 GitHub Pages）
+2. 多维表格「插件 → 自定义插件」填入页面地址
+3. 模板映射中确认「票据直链字段」指向表格的「票据直链」列
 
 ## 测试
 
 ```bash
 node scripts/smoke.mjs
-```
-
-## 目录
-
-```text
-src/
-  bitable.js        飞书 SDK 封装 + 演示数据（浏览器预览模式）
-  store.js          模板模型 / 增删改 / localStorage 持久化 / 导入导出
-  render.js         模板渲染引擎（字段变量替换、两种打印模式）
-  App.vue           外壳：连接状态、标签页
-  components/
-    TemplateEditor.vue   模板编辑器 + 实时预览
-    RecordPicker.vue     记录选择
-    PrintPreview.vue     预览打印 / 导出
 ```

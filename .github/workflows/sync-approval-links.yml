@@ -24,4 +24,5 @@ jobs:
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           BASE_TOKEN: ${{ secrets.BASE_TOKEN }}
           TABLE_ID: ${{ secrets.TABLE_ID }}
+          APPROVAL_DEFINITIONS: ${{ secrets.APPROVAL_DEFINITIONS }}
         run: node scripts/sync-approval-links.mjs

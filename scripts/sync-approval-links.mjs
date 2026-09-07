@@ -7,8 +7,7 @@
 
 const BASE_TOKEN = process.env.BASE_TOKEN
 const TABLE_ID = process.env.TABLE_ID
-const DEFS_DEFAULT =
-  'FF12E11B-CB61-487B-A551-A47C6C838F32,3CEE9405-4F03-43E9-BE3C-C7D149E5F089'
+const DEFS_DEFAULT = ''
 
 async function tenantToken() {
   const r = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
@@ -152,6 +151,7 @@ export async function main() {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
+  if (!defs.length) throw new Error('missing APPROVAL_DEFINITIONS env')
   // 拉最近 8 天所有记录里的编号作为候选（简单起见先收集全部记录中的编号）
   const all = await listRecords(token, new Set(['*']))
   const report = { scanned: 0, updated: 0, failed: [] }
