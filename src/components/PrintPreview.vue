@@ -63,7 +63,7 @@ function ensureExpenseAttachMsg(t, recs) {
     if (!entry || entry.urls?.length) continue
     if (!entry.msg) {
       if (cfg.directField) {
-        entry.msg = '该记录暂无票据直链：等待每小时自动同步，或稍后点「重试拉取票据」'
+        entry.msg = '该记录暂无票据直链：等待每 30 分钟自动同步，或点「重试拉取票据」'
       } else {
         entry.msg = '请在映射里选择「票据直链字段」以自动打印票据图片'
       }
