@@ -2,7 +2,7 @@ name: Sync Approval Attachments
 
 on:
   schedule:
-    - cron: '17 * * * *'   # 每小时第 17 分钟跑一次
+    - cron: '17,47 * * * *'   # 每 30 分钟跑一次（第 17、47 分钟）
   workflow_dispatch:
 
 permissions:
