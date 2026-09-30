@@ -10,6 +10,9 @@ import {
 } from '../render.js'
 import { download, escCsv, PRINT_CSS } from '../utils.js'
 
+// 由 vite.config.js 注入的构建时间，用于确认加载的是哪一版插件
+const BUILD_STAMP = typeof __BUILD_STAMP__ === 'string' ? __BUILD_STAMP__ : 'dev'
+
 const selected = computed(() =>
   ds.records.filter((r) => ds.selectedRecordIds.includes(r.recordId))
 )
@@ -141,7 +144,7 @@ function openPrintWindow() {
     alert('浏览器拦截了弹窗，请允许本页面弹出窗口后重试')
     return
   }
-  const title = currentTemplate.value?.name || '排版打印'
+  const title = `${currentTemplate.value?.name || '排版打印'} · 构建 ${BUILD_STAMP}`
   const pageCss =
     currentTemplate.value?.paper === 'a5'
       ? '<style>@page { size: 210mm 148mm; margin: 0; }</style>'
@@ -213,7 +216,7 @@ function exportDocx() {
     <div class="panel-title">预览与打印</div>
     <div class="preview-toolbar">
       <span class="muted">
-        模板：{{ currentTemplate?.name }} · 已选 {{ selected.length }} 条记录
+        模板：{{ currentTemplate?.name }} · 已选 {{ selected.length }} 条记录 · 构建 {{ BUILD_STAMP }}
       </span>
       <div class="btn-row">
         <button class="btn btn-primary" :disabled="!selected.length" @click="doPrint()">
