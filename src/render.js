@@ -367,10 +367,14 @@ function buildExpenseRows(lines, declaredAmount, blanksAfter, depRows, total) {
   const U = depRows
   const blankA = U >= 2 ? U - 1 : 0
   const blankB = bodyCount - U - 1 // 领导标签之后、合计之前的明细行数
+  // 多行明细时，每行显示自己解析出的金额；只有单行明细才回退到「金额/费用汇总」字段，
+  // 否则多行会重复显示同一个合计金额。
+  const singleLine = lines.length === 1
+  const fallbackAmt = declaredAmount == null || declaredAmount === '' ? '' : String(declaredAmount)
   const bodyTexts = lines.map((l) => ({
     cls: 'exp-data',
     item: esc(l.text),
-    amt: esc((declaredAmount || (l.amount != null ? fmtAmount(l.amount) : '')) || '')
+    amt: esc((l.amount != null ? fmtAmount(l.amount) : singleLine ? fallbackAmt : '') || '')
   }))
   for (let i = 0; i < blanksAfter; i++) {
     bodyTexts.push({ cls: 'exp-blank', item: '', amt: '' })

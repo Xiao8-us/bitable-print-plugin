@@ -171,8 +171,40 @@ const ehtml3 = renderAll(et3, [
     }
   }
 ])
-checks.push(['明细缩略仅保留内容', ehtml3.includes('购买电梯风扇') && !ehtml3.includes('报销内容:') && !ehtml3.includes('CNY') && !ehtml3.includes('8/29')])
+const detailCells3 = (
+  ehtml3.match(/<td class="exp-item">[^<]*<\/td><td class="exp-amt">[^<]*<\/td>/g) || []
+).join('')
+checks.push([
+  '明细缩略仅保留内容',
+  detailCells3.includes('购买电梯风扇') &&
+    !detailCells3.includes('报销内容:') &&
+    !detailCells3.includes('CNY') &&
+    !detailCells3.includes('8/29')
+])
 checks.push(['金额拆出与大写', ehtml3.includes('74.00') && ehtml3.includes('柒拾肆元整')])
+
+// 回归：多行明细 + 汇总金额字段同时存在时，每行要显示自己的金额，不能整列重复合计值
+const et7 = expenseTemplate()
+const ehtml7 = renderAll(et7, [
+  {
+    recordId: 'e7b',
+    fields: {
+      c1: '序泽贸易商行-大凡',
+      c2: '2026-09-22',
+      c3: '202609280002',
+      c4:
+        '报销内容:窗帘 | 日期（年-月-日）:2026-09-19 00:00:00 | 金额:69.600000 CNY;\n\n' +
+        '报销内容:轨道 | 日期（年-月-日）:2026-09-19 00:00:00 | 金额:213.840000 CNY',
+      c5: '283.44'
+    }
+  }
+])
+checks.push([
+  '多行明细各显示自己的金额',
+  (ehtml7.match(/69\.60/g) || []).length >= 1 && (ehtml7.match(/213\.84/g) || []).length >= 1
+])
+checks.push(['多行明细不再重复合计', (ehtml7.match(/283\.44/g) || []).length === 1])
+checks.push(['合计大写取汇总金额', ehtml7.includes('贰佰捌拾叁元肆角肆分')])
 
 // 附件独立成第二页
 const et4 = expenseTemplate()
