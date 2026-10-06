@@ -6,8 +6,19 @@ const search = ref('')
 const showAll = ref(false)
 const RENDER_CAP = 500
 
+// 选记录列表固定显示的字段（按字段名匹配）。
+// 主字段自己会显示在上面那行大字里，所以这里会自动跳过主字段，避免「申请编号」重复出现。
+// 如果表里找不到这些字段（比如换成别的表），自动回退到原来的「前三个非主字段」规则。
+const FIXED_LIST_FIELDS = ['申请编号', '费用汇总', '费用明细']
+
 const primaryField = computed(() => ds.fields.find((f) => f.isPrimary) || ds.fields[0])
-const secondaryFields = computed(() => ds.fields.filter((f) => !f.isPrimary).slice(0, 3))
+const secondaryFields = computed(() => {
+  const fixed = FIXED_LIST_FIELDS.filter((name) => name !== primaryField.value?.name)
+    .map((name) => ds.fields.find((f) => f.name === name))
+    .filter(Boolean)
+  if (fixed.length) return fixed
+  return ds.fields.filter((f) => !f.isPrimary).slice(0, 3)
+})
 
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
