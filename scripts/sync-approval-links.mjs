@@ -78,9 +78,10 @@ async function listRecords(token) {
         dateMs: numOrNull(f['报销日期']),
         createMs: numOrNull(f['发起时间']) || numOrNull(f['完成时间']),
         hasAttachment: Boolean(f['附件']),
-        directCount: String(f['票据直链'] || '')
+        directLinks: String(f['票据直链'] || '')
           .split(/\r?\n/)
-          .filter((s) => s.trim()).length
+          .map((s) => s.trim())
+          .filter(Boolean)
       })
     }
     pageToken = d.page_token || ''
@@ -207,6 +208,21 @@ async function updateRecord(token, recordId, urls) {
   )
 }
 
+// 飞书云文档的 download/authcode 直链是临时授权码（实测约 2~3 天失效），
+// 这里先探活：还能下载就跳过，失效了才重新去审批里拉一次。
+async function linkAlive(url) {
+  if (!/^https?:\/\//.test(String(url || ''))) return false
+  const ctrl = new AbortController()
+  try {
+    const r = await fetch(url, { redirect: 'follow', signal: ctrl.signal })
+    const ok = r.status >= 200 && r.status < 300
+    ctrl.abort()
+    return ok
+  } catch (e) {
+    return false
+  }
+}
+
 export async function main() {
   if (!process.env.FEISHU_APP_ID || !process.env.FEISHU_APP_SECRET) throw new Error('missing env')
   const token = await tenantToken()
@@ -218,16 +234,19 @@ export async function main() {
   await ensureField(token)
   const all = await listRecords(token)
   const recentFrom = Date.now() - Math.max(0, RECENT_DAYS) * DAY
-  const report = { records: all.length, checked: 0, updated: 0, skipped: 0, failed: [] }
+  const report = { records: all.length, alive: 0, checked: 0, updated: 0, skipped: 0, failed: [] }
   for (const rec of all) {
-    // 没有附件的记录不用查审批；已同步过的老记录默认跳过，避免每轮重复扫描
+    // 没有附件的记录不用查审批
     if (!rec.hasAttachment) {
       report.skipped++
       continue
     }
     const isRecent = Number.isFinite(rec.createMs) && rec.createMs >= recentFrom
-    if (rec.directCount > 0 && !FORCE_ALL && !isRecent) {
-      report.skipped++
+    // 直链还有效（且不是最近记录的补扫）就不用动它
+    const alive =
+      rec.directLinks.length > 0 && !FORCE_ALL && !isRecent ? await linkAlive(rec.directLinks[0]) : false
+    if (alive) {
+      report.alive++
       continue
     }
     report.checked++
