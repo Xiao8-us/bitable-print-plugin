@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { attachCache, ds, ensureRecords, prepareAttachmentsFor } from '../bitable.js'
+import { attachCache, ds, ensureRecords, prepareAttachmentsFor, reloadDirectField } from '../bitable.js'
 import { currentTemplate } from '../store.js'
 import {
   collectAttachmentBlocks,
@@ -118,10 +118,17 @@ async function doPrint() {
   try {
     const t = currentTemplate.value
     const ids = selected.value.map((r) => r.recordId)
-    // 重读选中的那几条记录，拿到同步任务刚写入的新直链。
-    // 只能用 ensureRecords(force)，绝不能调 loadRecords()——后者只保留当前视图内的记录，
+    const directField = t?.expense?.directField
+    const attachField = t?.expense?.attachment
+    // 重读数据，拿到同步任务刚写入的新直链。
+    // 默认走精准路径：只读「票据直链」这一个单元格（getCellString），不碰其它字段；
+    // 没配直链字段时才退回到整条重读。
+    // 注意：这里不能调 loadRecords()——它只保留当前视图内的记录，
     // 会把视图外 / 已被移出视图的已选记录静默踢掉，表现为「点了打印没反应」。
-    const { missing, failed } = await ensureRecords(ids, { force: true })
+    const { missing, failed } =
+      t?.kind === 'expense' && directField
+        ? await reloadDirectField(directField, ids)
+        : await ensureRecords(ids, { force: true })
     if (missing.length) {
       ds.selectedRecordIds = ds.selectedRecordIds.filter((id) => !missing.includes(id))
     }
@@ -130,7 +137,6 @@ async function doPrint() {
       ds.error = `有 ${failed.length} 条记录未能重新读取（网络或权限问题），本次打印的可能不是最新数据`
     }
     // 附件地址缓存是派生的，重读后必须清掉，否则 enrichApprovalAttachments 命中旧死链直接跳过
-    const attachField = t?.expense?.attachment
     if (attachField) {
       for (const id of ids) attachCache.delete(`${id}|${attachField}`)
     }

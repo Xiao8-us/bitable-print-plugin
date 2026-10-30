@@ -127,11 +127,26 @@ function loadMock() {
   ds.selectedRecordIds = []
 }
 
+// 富文本 / 链接字段的值是分段数组（IOpenSegment[]，Url 段形如 {type,text,link}），
+// 直接 String() 会变成 "[object Object]"，必须按段取文本
+function segmentText(s) {
+  if (s == null) return ''
+  if (typeof s === 'string') return s
+  if (typeof s !== 'object') return String(s)
+  return String(s.text ?? s.name ?? s.link ?? '')
+}
+
 export function formatCellValue(fid, v) {
   const meta = ds.fields.find((f) => f.id === fid)
   const t = meta?.type
   if (v == null || v === '') return ''
   switch (t) {
+    case FieldType.Text:
+      if (Array.isArray(v)) return v.map(segmentText).join('')
+      return segmentText(v)
+    case FieldType.Url:
+      if (Array.isArray(v)) return v.map(segmentText).filter(Boolean).join('、')
+      return String(v?.link || v?.text || v || '')
     case FieldType.DateTime:
       return typeof v === 'number' ? new Date(v).toLocaleString('zh-CN') : String(v)
     case FieldType.Checkbox:
@@ -152,6 +167,9 @@ export function formatCellValue(fid, v) {
     case FieldType.Object:
       return typeof v === 'object' ? JSON.stringify(v) : String(v)
     default:
+      // 兜底：分段数组 / 富文本对象一律按文本拼接，绝不让 [object Object] 漏到打印页
+      if (Array.isArray(v)) return v.map(segmentText).join('')
+      if (v && typeof v === 'object') return segmentText(v)
       return String(v)
   }
 }
@@ -347,6 +365,26 @@ export async function fetchRecordAttachments(fieldId, recordId) {
     attachCache.set(key, empty)
     return empty
   }
+}
+
+// 打印前精准刷新「票据直链」单个单元格：用 getCellString 只读这一个字段，
+// 不重读整条记录，避免 formatCellValue 对其它字段的格式风险，请求量也更小。
+// 同时兼作「记录是否还存在」的探测。
+export async function reloadDirectField(fieldId, ids) {
+  const missing = []
+  const failed = []
+  if (!ds.connected || !activeTable || !fieldId) return { missing, failed }
+  for (const id of ids) {
+    try {
+      const s = await activeTable.getCellString(fieldId, id)
+      const r = ds.records.find((x) => x.recordId === id)
+      if (r) r.fields[fieldId] = s == null ? '' : String(s)
+    } catch (e) {
+      if (isRecordMissing(e)) missing.push(id)
+      else failed.push(id)
+    }
+  }
+  return { missing, failed }
 }
 
 export async function prepareAttachmentsFor(fieldId, recordIds) {
