@@ -146,7 +146,8 @@ export function formatCellValue(fid, v) {
       return segmentText(v)
     case FieldType.Url:
       if (Array.isArray(v)) return v.map(segmentText).filter(Boolean).join('、')
-      return String(v?.link || v?.text || v || '')
+      // 显示值在 text（流水号 / "2 个附件"），link 是跳转地址，必须 text 优先
+      return String(v?.text || v?.link || v || '')
     case FieldType.DateTime:
       return typeof v === 'number' ? new Date(v).toLocaleString('zh-CN') : String(v)
     case FieldType.Checkbox:

@@ -1,4 +1,4 @@
-import { attachCache, ds } from '../src/bitable.js'
+import { attachCache, ds, formatCellValue } from '../src/bitable.js'
 import { amountUpperCn, extractSerial, renderAll } from '../src/render.js'
 import { expenseTemplate } from '../src/store.js'
 
@@ -250,6 +250,31 @@ checks.push(['图片直链多张横排', (htmlB.match(/<img /g) || []).length ==
 
 checks.push(['从申请编号提取流水号', extractSerial('[202601010001](https://applink.feishu.cn/x)') === '202601010001'])
 checks.push(['纯数字提取流水号', extractSerial('单号 202601010002 备注') === '202601010002'])
+
+// 回归：getRecordById 返回的是富文本分段数组（Text 是 [{type,text}]，Url 是 [{type,text,link}]），
+// formatCellValue 必须按段取文本，否则 String() 会得到 "[object Object]"，
+// 表现为打印页字段乱码、票据直链解析不出 URL 导致附件页整页空白。
+ds.fields = [
+  { id: 'fx_text', name: '文本', type: 1 },
+  { id: 'fx_url', name: '链接', type: 15 },
+  { id: 'fx_attach', name: '附件', type: 17 }
+]
+const urlSeg = { type: 'url', text: '202609140002', link: 'https://applink.feishu.cn/client/x' }
+checks.push(['Text 分段数组按段拼接', formatCellValue('fx_text', [{ type: 'text', text: '窗帘 69.60' }]) === '窗帘 69.60'])
+checks.push(['Text 多段拼接', formatCellValue('fx_text', [{ type: 'text', text: 'A' }, { type: 'text', text: 'B' }]) === 'AB'])
+checks.push(['Url 分段数组取显示文本', formatCellValue('fx_url', [urlSeg]) === '202609140002'])
+// Url 单对象必须 text 优先：显示值是流水号 / "2 个附件"，link 只是跳转地址
+checks.push(['Url 单对象取显示文本而非链接', formatCellValue('fx_url', urlSeg) === '202609140002'])
+checks.push(['附件数组取文件名', formatCellValue('fx_attach', [{ name: 'a.png' }]) === 'a.png'])
+checks.push([
+  '格式化结果不含 [object Object]',
+  ![
+    formatCellValue('fx_text', [{ type: 'text', text: 'a' }]),
+    formatCellValue('fx_text', { type: 'text', text: 'b' }),
+    formatCellValue('fx_url', urlSeg),
+    formatCellValue('fx_attach', [{ name: 'c.png' }])
+  ].some((s) => String(s).includes('[object Object]'))
+])
 
 let failed = false
 for (const [name, ok] of checks) {
