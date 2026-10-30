@@ -300,7 +300,10 @@ export async function main() {
         report.updated++
       }
     } catch (e) {
-      report.failed.push({ serial: rec.serial, reason: 'exception: ' + (e?.message || e) })
+      report.failed.push({
+        serial: rec.serial,
+        reason: `exception[${e?.code ?? e?.error?.code ?? '-'}]: ${e?.message || e}`
+      })
     }
     await sleep(150)
   }

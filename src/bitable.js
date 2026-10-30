@@ -243,13 +243,18 @@ export async function loadRecords() {
   }
 }
 
-// 飞书多维表格「记录不存在」错误码。只有这类错误才把记录从选择里移除，
-// 网络超时 / 限流等其它错误保留旧数据，避免一次抖动就清空用户的选择。
-const RECORD_NOT_FOUND = new Set([1254043])
+// 飞书多维表格「记录不存在」错误码：
+//   1254043 RecordIdNotFound / 1254006 WrongRecordId
+// SDK 经 bridge 抛错，不保证在 Error 上暴露 code，所以再用 message 兜底；
+// code 命中优先，message 只匹配很具体的字面量，避免把网络错误误判成记录被删。
+const RECORD_NOT_FOUND_CODES = new Set([1254043, 1254006])
+const RECORD_NOT_FOUND_PATTERN = /RecordIdNotFound|record[_ ]?id.{0,12}not found|记录不存在/i
 
 function isRecordMissing(e) {
-  const code = Number(e?.code ?? e?.error?.code)
-  return RECORD_NOT_FOUND.has(code)
+  const code = Number(e?.code ?? e?.error?.code ?? e?.data?.code)
+  if (RECORD_NOT_FOUND_CODES.has(code)) return true
+  const msg = String(e?.message ?? e ?? '')
+  return RECORD_NOT_FOUND_PATTERN.test(msg)
 }
 
 // force=true 时，已存在的记录也重新读取并原地替换（打印前刷新直链用）

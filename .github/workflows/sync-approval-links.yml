@@ -32,6 +32,8 @@ jobs:
           node-version: 20
       - name: Sync approval attachment links (loop)
         env:
+          # 用户输入一律经 env 中转，不直接拼进 shell（避免引号注入/非数字报错）
+          ROUNDS_INPUT: ${{ inputs.rounds }}
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           BASE_TOKEN: ${{ secrets.BASE_TOKEN }}
@@ -41,8 +43,10 @@ jobs:
           # GitHub 托管 runner 的默认 shell 是 bash -e，某轮 node 非 0 退出会直接
           # 终止整个 step，5.5 小时的守护就没了。这里用 if 包住（-e 对 if 条件豁免），
           # 保证单轮失败只记录不中断。
-          ROUNDS='${{ inputs.rounds }}'
-          if [ -z "$ROUNDS" ]; then ROUNDS=0; fi
+          ROUNDS="$ROUNDS_INPUT"
+          case "$ROUNDS" in
+            ''|*[!0-9]*) ROUNDS=0 ;;
+          esac
           if [ "$ROUNDS" -gt 0 ]; then
             end=$((SECONDS + ROUNDS * 1800))
           else
