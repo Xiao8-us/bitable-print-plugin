@@ -230,6 +230,9 @@ export async function loadRecords() {
     if (my === token) {
       ds.records = all
       ds.progress = 0
+      // 整体重读后，附件地址缓存全部失效。不清的话 enrichApprovalAttachments
+      // 会命中旧的死链直接 continue，表现为「点了刷新，预览还是坏图」。
+      attachCache.clear()
       const valid = ds.selectedRecordIds.filter((id) => all.some((r) => r.recordId === id))
       if (valid.length !== ds.selectedRecordIds.length) ds.selectedRecordIds = valid
     }
@@ -240,23 +243,42 @@ export async function loadRecords() {
   }
 }
 
-export async function ensureRecords(ids) {
-  if (!ds.connected || !activeTable) return
+// 飞书多维表格「记录不存在」错误码。只有这类错误才把记录从选择里移除，
+// 网络超时 / 限流等其它错误保留旧数据，避免一次抖动就清空用户的选择。
+const RECORD_NOT_FOUND = new Set([1254043])
+
+function isRecordMissing(e) {
+  const code = Number(e?.code ?? e?.error?.code)
+  return RECORD_NOT_FOUND.has(code)
+}
+
+// force=true 时，已存在的记录也重新读取并原地替换（打印前刷新直链用）
+export async function ensureRecords(ids, { force = false } = {}) {
+  if (!ds.connected || !activeTable) return { missing: [], failed: [] }
   const have = new Set(ds.records.map((r) => r.recordId))
+  const missing = []
+  const failed = []
   for (const id of ids) {
-    if (have.has(id)) continue
+    if (!force && have.has(id)) continue
     try {
       const val = await activeTable.getRecordById(id)
       const fields = {}
       for (const [fid, v] of Object.entries(val.fields || {})) {
         fields[fid] = formatCellValue(fid, v)
       }
-      ds.records.push({ recordId: val.recordId, fields })
-      have.add(id)
+      const i = ds.records.findIndex((r) => r.recordId === id)
+      if (i >= 0) {
+        ds.records[i] = { recordId: id, fields }
+      } else {
+        ds.records.push({ recordId: id, fields })
+        have.add(id)
+      }
     } catch (e) {
-      /* 单条失败不阻断整体 */
+      if (isRecordMissing(e)) missing.push(id)
+      else failed.push(id)
     }
   }
+  return { missing, failed }
 }
 
 export async function pickRecordsByDialog() {

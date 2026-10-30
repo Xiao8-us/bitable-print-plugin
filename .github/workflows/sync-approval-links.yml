@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '17,47 * * * *'   # 仅作兜底：循环 job 意外结束时的重启信号
   workflow_dispatch:
+    inputs:
+      rounds:
+        description: '运行轮数（0 = 循环到 330 分钟；>0 只跑指定轮数，便于立即拿到日志验证）'
+        required: false
+        default: '0'
 
 permissions:
   contents: read
@@ -36,7 +41,13 @@ jobs:
           # GitHub 托管 runner 的默认 shell 是 bash -e，某轮 node 非 0 退出会直接
           # 终止整个 step，5.5 小时的守护就没了。这里用 if 包住（-e 对 if 条件豁免），
           # 保证单轮失败只记录不中断。
-          end=$((SECONDS + 19800))
+          ROUNDS='${{ inputs.rounds }}'
+          if [ -z "$ROUNDS" ]; then ROUNDS=0; fi
+          if [ "$ROUNDS" -gt 0 ]; then
+            end=$((SECONDS + ROUNDS * 1800))
+          else
+            end=$((SECONDS + 19800))
+          fi
           i=0
           while [ $SECONDS -lt $end ]; do
             i=$((i + 1))
@@ -47,6 +58,8 @@ jobs:
             if [ $rc -ne 0 ]; then
               echo "::warning::round $i failed with exit $rc"
             fi
+            # 指定轮数时跑满即退出，方便手动触发后立刻拿到日志
+            if [ "$ROUNDS" -gt 0 ] && [ $i -ge "$ROUNDS" ]; then break; fi
             # 按剩余时间睡，最后不足 30 分钟时只睡剩余的，避免顶穿 job 超时
             remaining=$((end - SECONDS))
             if [ $remaining -gt 0 ]; then

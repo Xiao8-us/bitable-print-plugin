@@ -1287,3 +1287,22 @@ textarea.input {
     page-break-after: auto;
   }
 }
+
+/* ===== 附件加载失败 ===== */
+.attach-failed img {
+  display: none;
+}
+
+.attach-item.attach-failed,
+.landscape-item.attach-failed {
+  border: 1px dashed #f54a45;
+}
+
+.attach-fail-tip {
+  border: 1px dashed #f54a45;
+  color: #a32d2d;
+  font-size: 10pt;
+  line-height: 1.5;
+  padding: 6px 8px;
+  word-break: break-all;
+}

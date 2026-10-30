@@ -132,7 +132,7 @@ function attachmentsHtml(record, fieldId, cached, perRow, webOnly = false) {
     ? `<div class="attach-grid" style="grid-template-columns:repeat(${perRow},1fr)">${imgs
         .map(
           (i) =>
-            `<figure class="attach-item"><img src="${esc(i.url)}" alt="附件" /></figure>`
+            `<figure class="attach-item"><img src="${esc(i.url)}" alt="附件" data-attach="1" /></figure>`
         )
         .join('')}</div>`
     : ''
@@ -208,7 +208,7 @@ export async function enrichApprovalAttachments(template, records) {
   if (!template || template.kind !== 'expense' || !records?.length) return
   const cfg = template.expense
   if (!cfg?.attachment) return
-  for (const r of records.slice(0, 30)) {
+  for (const r of records) {
     const key = `${r.recordId}|${cfg.attachment}`
     if (attachCache.has(key)) continue
     const directUrls = cfg.directField
@@ -511,7 +511,7 @@ function expenseAttachPages(template, record) {
   const builders = []
   if (portraits.length) {
     const figs = portraits
-      .map((u) => `<figure class="attach-item"><img src="${esc(u)}" alt="附件" /></figure>`)
+      .map((u) => `<figure class="attach-item"><img src="${esc(u)}" alt="附件" data-attach="1" /></figure>`)
       .join('')
     builders.push(
       attachPageBuilder(
@@ -529,7 +529,7 @@ function expenseAttachPages(template, record) {
     <span class="attach-page-title">费用报销单 · 附件票据</span>
     <span class="attach-page-no-label">编号：${esc(label)}</span>
   </div>
-  <figure class="landscape-item"><img src="${esc(u)}" alt="附件" /></figure>
+  <figure class="landscape-item"><img src="${esc(u)}" alt="附件" data-attach="1" /></figure>
   <div class="exp-page-no">${page}/${pages}</div>
 </div>`
     })

@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { attachCache, ds, prepareAttachmentsFor } from '../bitable.js'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { attachCache, ds, ensureRecords, prepareAttachmentsFor } from '../bitable.js'
 import { currentTemplate } from '../store.js'
 import {
   collectAttachmentBlocks,
@@ -17,44 +17,54 @@ const selected = computed(() =>
   ds.records.filter((r) => ds.selectedRecordIds.includes(r.recordId))
 )
 const html = ref('')
-let refreshing = false
+const printing = ref(false)
+// 正在跑的 refresh Promise。并发调用直接复用同一个实例，
+// 这样 await refresh() 一定能等到 refreshPending 追加的最后一轮结束；
+// 用「等两帧 HTML 不变」之类的启发式判断，在慢网络下会误判。
+let refTask = null
 let refreshPending = false
 const previewDim = computed(() =>
   currentTemplate.value?.paper === 'a5' ? { w: 794, h: 559 } : { w: 794, h: 1123 }
 )
 
-async function refresh() {
-  if (refreshing) {
+function refresh() {
+  if (refTask) {
     refreshPending = true
+    return refTask
+  }
+  refTask = (async () => {
+    try {
+      do {
+        refreshPending = false
+        await renderOnce()
+      } while (refreshPending)
+    } finally {
+      refTask = null
+    }
+  })()
+  return refTask
+}
+
+async function renderOnce() {
+  const t = currentTemplate.value
+  const recs = selected.value
+  if (!t) {
+    html.value = ''
     return
   }
-  refreshing = true
-  try {
-    do {
-      refreshPending = false
-      const t = currentTemplate.value
-      const recs = selected.value
-      if (!t) {
-        html.value = ''
-        return
-      }
-      html.value = renderAll(t, recs)
-      updateScale()
-      await enrichApprovalAttachments(t, recs)
-      await inspectAttachmentOrientations(t, recs)
-      const blocks = collectAttachmentBlocks(t)
-      if (blocks.length) {
-        for (const b of blocks) {
-          await prepareAttachmentsFor(b.fieldId, recs.slice(0, 50).map((r) => r.recordId))
-        }
-      }
-      ensureExpenseAttachMsg(t, recs)
-      if (currentTemplate.value === t) {
-        html.value = renderAll(currentTemplate.value, selected.value)
-      }
-    } while (refreshPending)
-  } finally {
-    refreshing = false
+  html.value = renderAll(t, recs)
+  updateScale()
+  await enrichApprovalAttachments(t, recs)
+  await inspectAttachmentOrientations(t, recs)
+  const blocks = collectAttachmentBlocks(t)
+  if (blocks.length) {
+    for (const b of blocks) {
+      await prepareAttachmentsFor(b.fieldId, recs.slice(0, 50).map((r) => r.recordId))
+    }
+  }
+  ensureExpenseAttachMsg(t, recs)
+  if (currentTemplate.value === t) {
+    html.value = renderAll(currentTemplate.value, selected.value)
   }
 }
 
@@ -86,6 +96,11 @@ function retryAttachments() {
 
 watch(() => currentTemplate.value, refresh, { deep: true, immediate: true })
 watch(() => [ds.records, ds.selectedRecordIds], refresh, { deep: true })
+// v-html 每次重渲染都会重建 DOM，error 监听必须在渲染后重新绑
+watch(html, async () => {
+  await nextTick()
+  bindAttachErrors()
+})
 
 const pageScale = ref(0.55)
 function updateScale() {
@@ -97,31 +112,74 @@ onMounted(() => {
 })
 onUnmounted(() => window.removeEventListener('resize', updateScale))
 
-function doPrint() {
-  if (!selected.value.length) return
-  ensurePageCss()
-  waitAppImages(() => window.print())
+async function doPrint() {
+  if (!selected.value.length || printing.value) return
+  printing.value = true
+  try {
+    const t = currentTemplate.value
+    const ids = selected.value.map((r) => r.recordId)
+    // 重读选中的那几条记录，拿到同步任务刚写入的新直链。
+    // 只能用 ensureRecords(force)，绝不能调 loadRecords()——后者只保留当前视图内的记录，
+    // 会把视图外 / 已被移出视图的已选记录静默踢掉，表现为「点了打印没反应」。
+    const { missing } = await ensureRecords(ids, { force: true })
+    if (missing.length) {
+      ds.selectedRecordIds = ds.selectedRecordIds.filter((id) => !missing.includes(id))
+    }
+    // 附件地址缓存是派生的，重读后必须清掉，否则 enrichApprovalAttachments 命中旧死链直接跳过
+    const attachField = t?.expense?.attachment
+    if (attachField) {
+      for (const id of ids) attachCache.delete(`${id}|${attachField}`)
+    }
+    await refresh()
+    await waitImagesReady()
+    ensurePageCss()
+    window.print()
+  } finally {
+    printing.value = false
+  }
 }
 
-function waitAppImages(cb) {
-  const imgs = Array.from(document.querySelectorAll('.print-shell img'))
-  if (!imgs.length) {
-    setTimeout(cb, 150)
-    return
-  }
-  let done = 0
-  const onDone = () => {
-    done++
-    if (done >= imgs.length) cb()
-  }
-  imgs.forEach((img) => {
-    if (img.complete) onDone()
-    else {
-      img.onload = onDone
-      img.onerror = onDone
+// 等附件图真正解码完成再打印，避免打出半张 / 空白
+function waitImagesReady(timeout = 10000) {
+  return new Promise((resolve) => {
+    const imgs = Array.from(document.querySelectorAll('.print-shell img[data-attach]'))
+    if (!imgs.length) {
+      setTimeout(resolve, 150)
+      return
     }
+    let done = 0
+    const tick = () => {
+      if (++done >= imgs.length) resolve()
+    }
+    imgs.forEach((img) => {
+      if (img.complete) tick()
+      else {
+        img.onload = tick
+        img.onerror = tick
+      }
+    })
+    setTimeout(resolve, timeout)
   })
-  setTimeout(cb, 8000)
+}
+
+// 图片加载失败时给可见提示，而不是打出一片空白让人猜原因
+function bindAttachErrors() {
+  const imgs = document.querySelectorAll('.print-shell img[data-attach]')
+  imgs.forEach((img) => {
+    const fail = () => {
+      const fig = img.closest('figure') || img.parentElement
+      if (!fig || fig.dataset.failed) return
+      fig.dataset.failed = '1'
+      fig.classList.add('attach-failed')
+      const tip = document.createElement('div')
+      tip.className = 'attach-fail-tip'
+      tip.textContent =
+        '票据无法显示：可能是链接已过期，或该票据是 PDF/OFD 等非图片格式。可点右上角「刷新」重新读取表格后再试；若仍空白，请到多维表格查看原票据文件。'
+      fig.appendChild(tip)
+    }
+    if (img.complete && img.naturalWidth === 0) fail()
+    else img.addEventListener('error', fail, { once: true })
+  })
 }
 
 function ensurePageCss() {
@@ -219,7 +277,7 @@ function exportDocx() {
         模板：{{ currentTemplate?.name }} · 已选 {{ selected.length }} 条记录 · 构建 {{ BUILD_STAMP }}
       </span>
       <div class="btn-row">
-        <button class="btn btn-primary" :disabled="!selected.length" @click="doPrint()">
+        <button class="btn btn-primary" :disabled="!selected.length || printing" @click="doPrint()">
           打印 / 存为 PDF
         </button>
         <button class="btn" :disabled="!selected.length" @click="openPrintWindow()">
