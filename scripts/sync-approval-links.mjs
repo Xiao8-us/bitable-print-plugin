@@ -1,11 +1,13 @@
 // GitHub Actions 定时任务：把审批票据直链写回多维表格“票据直链”字段
+// 主判据是「直链刷新时间」的年龄（默认 16 小时到期重拉），探活只做写入前校验。
 // 环境变量：
 //   FEISHU_APP_ID / FEISHU_APP_SECRET  审批应用（机器人身份）
 //   BASE_TOKEN                         多维表格 app token
 //   TABLE_ID                           数据表 id
 //   APPROVAL_DEFINITIONS               可选，多个审批定义 code 逗号分隔
-//   SYNC_FORCE_ALL                     可选，设为 1 时忽略已有直链、全量重扫
-//   SYNC_RECENT_DAYS                   可选，最近 N 天内的记录每次都重扫（默认 3）
+//   SYNC_FORCE_ALL                     可选，设为 1 时忽略年龄、全量重扫
+//   SYNC_RECENT_DAYS                   可选，最近 N 天内的记录每次都重扫（默认 1）
+//   SYNC_MAX_AGE_HOURS                 可选，直链保鲜期小时数（默认 16）
 
 const BASE_TOKEN = process.env.BASE_TOKEN
 const TABLE_ID = process.env.TABLE_ID
@@ -14,7 +16,13 @@ const HOUR = 3600 * 1000
 const DAY = 24 * HOUR
 const TZ_OFFSET = 8 * HOUR // 审批与多维表格都按北京时间划分自然日
 const FORCE_ALL = process.env.SYNC_FORCE_ALL === '1'
-const RECENT_DAYS = Number(process.env.SYNC_RECENT_DAYS || 3)
+// 有了「直链刷新时间」做定期重拉后，重拉本身就会重新扫审批附件列表，
+// 后补的附件最多延迟一个保鲜期被发现，所以「最近 N 天每轮重扫」已无必要，默认降到 1 天。
+const RECENT_DAYS = Number(process.env.SYNC_RECENT_DAYS || 1)
+// 直链寿命实测下界约 20.2 小时（10/29 14:27 重拉的那批，20.2h 仍可下载，24.5h 已 400）。
+// 16 小时保鲜期留出 4 小时余量，足以覆盖「循环 job 330 分钟结束 + cron 最长拖到 435 分钟」
+// 造成的约 1.75 小时断档。
+const MAX_AGE = (Number(process.env.SYNC_MAX_AGE_HOURS) || 16) * HOUR
 
 async function tenantToken() {
   const r = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
@@ -78,6 +86,7 @@ async function listRecords(token) {
         dateMs: numOrNull(f['报销日期']),
         createMs: numOrNull(f['发起时间']) || numOrNull(f['完成时间']),
         hasAttachment: Boolean(f['附件']),
+        refreshedAt: numOrNull(f['直链刷新时间']),
         directLinks: String(f['票据直链'] || '')
           .split(/\r?\n/)
           .map((s) => s.trim())
@@ -184,17 +193,29 @@ async function fetchSerialUrls(token, defs, rec) {
   return null
 }
 
+// 需要保证存在的字段：票据直链（多行文本，type 1）+ 直链刷新时间（日期，type 5）
+const ENSURE_FIELDS = [
+  { name: '票据直链', type: 1 },
+  { name: '直链刷新时间', type: 5 }
+]
+
 async function ensureField(token) {
   const list = await lark(
     token,
     `https://open.feishu.cn/open-apis/bitable/v1/apps/${BASE_TOKEN}/tables/${TABLE_ID}/fields?page_size=100`
   )
-  const has = (list.items || []).some((f) => f.field_name === '票据直链')
-  if (has) return
-  await lark(token, `https://open.feishu.cn/open-apis/bitable/v1/apps/${BASE_TOKEN}/tables/${TABLE_ID}/fields`, {
-    method: 'POST',
-    body: JSON.stringify({ field_name: '票据直链', type: 1 })
-  })
+  const have = new Set((list.items || []).map((f) => f.field_name))
+  let created = false
+  for (const f of ENSURE_FIELDS) {
+    if (have.has(f.name)) continue
+    await lark(token, `https://open.feishu.cn/open-apis/bitable/v1/apps/${BASE_TOKEN}/tables/${TABLE_ID}/fields`, {
+      method: 'POST',
+      body: JSON.stringify({ field_name: f.name, type: f.type })
+    })
+    created = true
+  }
+  // 新建字段后等一小会儿再写，避免字段还没传播到写接口时首批 PUT 报「字段不存在」
+  if (created) await sleep(1500)
 }
 
 async function updateRecord(token, recordId, urls) {
@@ -203,23 +224,37 @@ async function updateRecord(token, recordId, urls) {
     `https://open.feishu.cn/open-apis/bitable/v1/apps/${BASE_TOKEN}/tables/${TABLE_ID}/records/${recordId}`,
     {
       method: 'PUT',
-      body: JSON.stringify({ fields: { '票据直链': urls.join('\n') } })
+      // 同一次 PUT 里顺带写入刷新时间，不额外增加请求
+      body: JSON.stringify({
+        fields: {
+          '票据直链': urls.join('\n'),
+          '直链刷新时间': Date.now()
+        }
+      })
     }
   )
 }
 
-// 飞书云文档的 download/authcode 直链是临时授权码（实测约 2~3 天失效），
-// 这里先探活：还能下载就跳过，失效了才重新去审批里拉一次。
-async function linkAlive(url) {
-  if (!/^https?:\/\//.test(String(url || ''))) return false
+// 校验直链可否下载。只作为「写入前后校验」，不再用作存活判断：
+// 飞书过期直链通常返回 4xx，个别情况会返回 200 的提示页，所以状态码和内容类型都要看。
+// 返回 image / file / dead 三态，octet-stream 是飞书图片常见的返回类型，不能判死。
+async function probe(url) {
+  if (!/^https?:\/\//.test(String(url || ''))) return 'dead'
   const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 12000)
   try {
     const r = await fetch(url, { redirect: 'follow', signal: ctrl.signal })
-    const ok = r.status >= 200 && r.status < 300
-    ctrl.abort()
-    return ok
+    r.body?.cancel()
+    if (r.status < 200 || r.status >= 300) return 'dead'
+    const ct = String(r.headers.get('content-type') || '').toLowerCase()
+    if (ct.startsWith('image/')) return 'image'
+    if (ct.includes('octet-stream') || ct.includes('pdf')) return 'file'
+    return 'dead'
   } catch (e) {
-    return false
+    return 'dead'
+  } finally {
+    clearTimeout(timer)
+    ctrl.abort()
   }
 }
 
@@ -234,7 +269,7 @@ export async function main() {
   await ensureField(token)
   const all = await listRecords(token)
   const recentFrom = Date.now() - Math.max(0, RECENT_DAYS) * DAY
-  const report = { records: all.length, alive: 0, checked: 0, updated: 0, skipped: 0, failed: [] }
+  const report = { records: all.length, fresh: 0, checked: 0, updated: 0, skipped: 0, failed: [] }
   for (const rec of all) {
     // 没有附件的记录不用查审批
     if (!rec.hasAttachment) {
@@ -242,24 +277,40 @@ export async function main() {
       continue
     }
     const isRecent = Number.isFinite(rec.createMs) && rec.createMs >= recentFrom
-    // 直链还有效（且不是最近记录的补扫）就不用动它
-    const alive =
-      rec.directLinks.length > 0 && !FORCE_ALL && !isRecent ? await linkAlive(rec.directLinks[0]) : false
-    if (alive) {
-      report.alive++
+    // 主判据是「直链年龄」而不是探活：老数据没有刷新时间字段 → ageMs 为 Infinity
+    // → 首次运行自动全量重拉，正好完成历史数据初始化。
+    const ageMs = Number.isFinite(rec.refreshedAt) ? Date.now() - rec.refreshedAt : Infinity
+    const stale = FORCE_ALL || !Number.isFinite(ageMs) || ageMs > MAX_AGE
+    if (!stale && !isRecent) {
+      report.fresh++
       continue
     }
     report.checked++
-    const urls = await fetchSerialUrls(token, defs, rec)
-    if (urls && urls.length) {
-      await updateRecord(token, rec.recordId, urls)
-      report.updated++
-    } else {
-      report.failed.push(rec.serial)
+    // 单条记录出错不能带垮整轮：一次权限/字段异常会让后面所有记录都被跳过 30 分钟
+    try {
+      const urls = await fetchSerialUrls(token, defs, rec)
+      if (!urls || !urls.length) {
+        report.failed.push({ serial: rec.serial, reason: 'not-found-in-approval' })
+      } else if ((await probe(urls[0])) === 'dead') {
+        // 写入前校验：宁可这一轮不写、下一轮再试，也不要把死链写进表里
+        // （死链一旦写入并带上新的刷新时间，就会骗过年龄判断，卡住 16 小时）
+        report.failed.push({ serial: rec.serial, reason: 'pulled-but-unreachable' })
+      } else {
+        await updateRecord(token, rec.recordId, urls)
+        report.updated++
+      }
+    } catch (e) {
+      report.failed.push({ serial: rec.serial, reason: 'exception: ' + (e?.message || e) })
     }
     await sleep(150)
   }
   console.log(JSON.stringify(report, null, 2))
+  if (report.failed.length) {
+    console.log(`::warning::${report.failed.length} 条记录本轮未取得可用直链`)
+    for (const f of report.failed.slice(0, 20)) {
+      console.log(`  - ${f.serial} (${f.reason})`)
+    }
+  }
 }
 
 import { pathToFileURL } from 'node:url'

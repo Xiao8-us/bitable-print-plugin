@@ -2,15 +2,22 @@ name: Sync Approval Attachments
 
 on:
   schedule:
-    - cron: '17,47 * * * *'   # 每 30 分钟跑一次（第 17、47 分钟）
+    - cron: '17,47 * * * *'   # 仅作兜底：循环 job 意外结束时的重启信号
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# cron 触发时会取消正在跑的循环 job（否则会叠加多个 5.5 小时的 job）。
+# 被取消的同步是逐条幂等写入，最多漏刷几条，下一轮按直链年龄自动补上。
+concurrency:
+  group: sync-approval
+  cancel-in-progress: true
+
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 355
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,11 +25,32 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Sync approval attachment links
+      - name: Sync approval attachment links (loop)
         env:
           FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
           FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
           BASE_TOKEN: ${{ secrets.BASE_TOKEN }}
           TABLE_ID: ${{ secrets.TABLE_ID }}
           APPROVAL_DEFINITIONS: ${{ secrets.APPROVAL_DEFINITIONS }}
-        run: node scripts/sync-approval-links.mjs
+        run: |
+          # GitHub 托管 runner 的默认 shell 是 bash -e，某轮 node 非 0 退出会直接
+          # 终止整个 step，5.5 小时的守护就没了。这里用 if 包住（-e 对 if 条件豁免），
+          # 保证单轮失败只记录不中断。
+          end=$((SECONDS + 19800))
+          i=0
+          while [ $SECONDS -lt $end ]; do
+            i=$((i + 1))
+            start=$(date -u +%s)
+            if node scripts/sync-approval-links.mjs; then rc=0; else rc=$?; fi
+            elapsed=$(( $(date -u +%s) - start ))
+            echo "[round $i] exit=$rc elapsed=${elapsed}s at $(date -u +%FT%TZ)"
+            if [ $rc -ne 0 ]; then
+              echo "::warning::round $i failed with exit $rc"
+            fi
+            # 按剩余时间睡，最后不足 30 分钟时只睡剩余的，避免顶穿 job 超时
+            remaining=$((end - SECONDS))
+            if [ $remaining -gt 0 ]; then
+              if [ $remaining -lt 1800 ]; then sleep $remaining; else sleep 1800; fi
+            fi
+          done
+          echo "loop finished after $i rounds"
